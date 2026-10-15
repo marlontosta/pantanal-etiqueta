@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Etiqueta de Manutenção</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilo.css">
+
+</head>
+<body>
+<main class="wrap">
+  <header class="brandbar">
+    <img src="logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
+    <nav class="brandlinks" aria-label="Contato da oficina">
+      <a id="insta" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.8.1 3.3.1 4.8 1.7 4.9 4.9.1 1.3.1 1.6.1 4.8s0 3.6-.1 4.8c-.1 3.2-1.7 4.8-4.9 4.9-1.3.1-1.6.1-4.8.1s-3.6 0-4.8-.1c-3.3-.1-4.8-1.7-4.9-4.9C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.8C2.4 3.9 3.9 2.4 7.2 2.3 8.4 2.2 8.8 2.2 12 2.2zm0 4.8a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 8.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4zm5.2-9.6a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z"/></svg><span id="instaTxt"></span></a>
+      <a id="whatsTopo" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg><span id="foneTopo"></span></a>
+    </nav>
+  </header>
+
+  <section class="sticker" aria-labelledby="titulo">
+    <div class="top">
+      <div class="kicker" id="titulo">Etiqueta digital de manutenção</div>
+      <h1 class="plate" aria-label="Placa do veículo"><span id="placa">–</span></h1>
+    </div>
+    <dl class="facts">
+      <div><dt>Última visita</dt><dd class="tab" id="ultData">–</dd></div>
+      <div><dt>Km na última visita</dt><dd class="tab" id="ultKm">–</dd></div>
+    </dl>
+  </section>
+
+  <section class="kmbox">
+    <label for="km">Quilometragem atual do veículo</label>
+    <div class="kmrow">
+      <input id="km" type="text" inputmode="numeric" autocomplete="off" aria-describedby="kmhint">
+      <span>km</span>
+    </div>
+    <div class="kmhint" id="kmhint">Digite o valor do painel para recalcular.</div>
+  </section>
+
+  <div class="notice" id="aviso" hidden></div>
+
+  <section class="summary" aria-label="Resumo">
+    <div class="chip bad"><span class="num tab" id="nBad">0</span> vencidas</div>
+    <div class="chip warn"><span class="num tab" id="nWarn">0</span> próximas</div>
+    <div class="chip ok"><span class="num tab" id="nOk">0</span> em dia</div>
+  </section>
+
+  <section class="sticker" aria-label="Próximas manutenções">
+    <div class="label-head">Próximas manutenções</div>
+    <ul class="list" id="lista"></ul>
+  </section>
+
+  <section class="sticker contact">
+    <div class="small" id="contatoTxt">Fale com a oficina para agendar.</div>
+    <a class="btn" id="whats" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>Agendar pelo WhatsApp</a>
+  </section>
+
+  <section class="sticker contact">
+    <div class="small">Histórico e detalhes de todas as manutenções do veículo.</div>
+    <a class="b primary" id="detalhes" href="#" target="_blank" rel="noopener">Ver detalhes no Sobre Rodas</a>
+  </section>
+
+  <footer class="small legend">
+    <div><b style="color:var(--ok)">●</b> Em dia: longe do limite.</div>
+    <div><b style="color:var(--warn)">●</b> Próxima: faltam até 10% do intervalo ou 3.000 km (o que for menor), ou até 30 dias.</div>
+    <div><b style="color:var(--bad)">●</b> Vencida: passou da quilometragem ou da data.</div>
+    <div>A previsão de mês é estimada pela média de km rodados por dia desde a última visita.</div>
+    <div class="foot-links"><span>Dados lidos da etiqueta NFC do veículo.</span><a href="gravar.html">Área da oficina</a></div>
+  </footer>
+</main>
+
+<script src="config.js"></script>
+<script>
+const CFG = window.ETIQUETA, U = window.ETQ;
+const $ = id => document.getElementById(id);
+const fmtKm = n => Math.round(n).toLocaleString("pt-BR");
+const fmtData = d => d.toLocaleDateString("pt-BR");
+const fmtMes = d => d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(".", "");
+const addMeses = (d, m) => { const r = new Date(d); r.setMonth(r.getMonth() + m); return r; };
+const DIA = 86400000;
+const hoje = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const RANK = { bad: 0, warn: 1, ok: 2, none: 3 };
+const TEXTO = { bad: "Vencida", warn: "Próxima", ok: "Em dia", none: "Sem registro" };
+
+// Exemplo mostrado quando a página é aberta sem os dados da etiqueta.
+const EXEMPLO = "placa=ABC1D23&oleo-km=27350&oleo-dt=2026-04-22&alinhamento-km=21800&alinhamento-dt=2025-11-10&balanceamento-km=27350&balanceamento-dt=2026-04-22&hig-ar-dt=2026-04-22&hig-km=27350";
+
+let params = new URLSearchParams(location.search);
+const temDados = params.has("placa") || CFG.servicos.some(s => params.has(s.km) || params.has(s.dt));
+if (!temDados) params = new URLSearchParams(EXEMPLO);
+
+const placa = U.placa(params.get("placa")) || "–";
+const registros = CFG.servicos.map(s => ({ ...s, ultKm: U.km(params.get(s.km)), ultData: U.data(params.get(s.dt)) }));
+
+// Visita mais recente: maior km e data mais recente entre os serviços.
+const kms = registros.map(r => r.ultKm).filter(v => v != null);
+const datas = registros.map(r => r.ultData).filter(Boolean);
+const kmUltimo = kms.length ? Math.max(...kms) : 0;
+const dataUltima = datas.length ? new Date(Math.max(...datas)) : null;
+
+function calcular(kmAtual) {
+  const m = CFG.margem;
+  const kmPorDia = dataUltima && kmAtual > kmUltimo ? (kmAtual - kmUltimo) / Math.max(1, (hoje() - dataUltima) / DIA) : 0;
+
+  return registros.map(r => {
+    const it = { ...r, status: "none", usado: 0 };
+    if (r.ultKm == null && !r.ultData) return it;
+    let status = "ok";
+    if (r.ultKm != null) {
+      it.proxKm = r.ultKm + r.intervalo_km;
+      it.faltaKm = it.proxKm - kmAtual;
+      const margem = Math.min(r.intervalo_km * m.fracao, m.km);
+      status = it.faltaKm <= 0 ? "bad" : it.faltaKm <= margem ? "warn" : "ok";
+      it.usado = Math.min(1, Math.max(0, (kmAtual - r.ultKm) / r.intervalo_km));
+      if (it.faltaKm > 0 && kmPorDia > 0) it.estimada = new Date(hoje().getTime() + (it.faltaKm / kmPorDia) * DIA);
+    }
+    if (r.ultData && r.intervalo_meses) {
+      it.proxData = addMeses(r.ultData, r.intervalo_meses);
+      it.faltaDias = Math.round((it.proxData - hoje()) / DIA);
+      const st = it.faltaDias < 0 ? "bad" : it.faltaDias <= m.dias ? "warn" : "ok";
+      if (RANK[st] < RANK[status]) status = st;
+      // Sem km registrado, a barra mostra o tempo decorrido
+      if (r.ultKm == null) it.usado = Math.min(1, Math.max(0, (hoje() - r.ultData) / (it.proxData - r.ultData)));
+    }
+    it.status = status;
+    return it;
+  }).sort((a, b) => RANK[a.status] - RANK[b.status] || (a.faltaKm ?? 1e9) - (b.faltaKm ?? 1e9));
+}
+
+function el(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+function render() {
+  const kmAtual = U.km($("km").value) || 0;
+  const itens = calcular(kmAtual);
+  const lista = $("lista");
+  lista.replaceChildren();
+  const cont = { bad: 0, warn: 0, ok: 0, none: 0 };
+
+  for (const it of itens) {
+    cont[it.status]++;
+    const li = el("li", "item " + it.status);
+    li.append(el("span", "dot"));
+    const b = el("div", "body");
+
+    const r1 = el("div", "row1");
+    const tt = el("div", "ttl"); tt.append(el("span", "grp", it.grupo), el("h2", null, it.nome));
+    r1.append(tt, el("span", "pill", TEXTO[it.status]));
+    b.append(r1);
+
+    const meta = el("div", "meta tab");
+    if (it.status === "none") {
+      meta.append(el("span", null, "Ainda não registrado na etiqueta. A cada " + fmtKm(it.intervalo_km) + " km ou " + it.intervalo_meses + " meses."));
+      b.append(meta); li.append(b); lista.append(li); continue;
+    }
+
+    const partes = [];
+    if (it.proxKm != null) partes.push(fmtKm(it.proxKm) + " km");
+    if (it.proxData) partes.push(fmtData(it.proxData));
+    b.append(el("div", "next tab", "Próxima: " + partes.join(" ou ")));
+
+    const bar = el("div", "bar"); const fill = el("i"); fill.style.width = (it.usado * 100).toFixed(1) + "%"; bar.append(fill);
+    bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-valuenow", Math.round(it.usado * 100));
+    bar.setAttribute("aria-valuemin", 0); bar.setAttribute("aria-valuemax", 100); bar.setAttribute("aria-label", "Intervalo usado");
+    b.append(bar);
+
+    const feito = [];
+    if (it.ultData) feito.push("em " + fmtData(it.ultData));
+    if (it.ultKm != null) feito.push("com " + fmtKm(it.ultKm) + " km");
+    meta.append(el("span", null, "Feito " + feito.join(" ")));
+    if (it.faltaKm != null) meta.append(el("span", null, it.faltaKm > 0 ? "Faltam " + fmtKm(it.faltaKm) + " km" : "Passou " + fmtKm(-it.faltaKm) + " km"));
+    if (it.faltaDias != null && it.faltaDias < 0) meta.append(el("span", null, "Prazo vencido há " + (-it.faltaDias) + " dias"));
+    else if (it.faltaDias != null && it.faltaDias <= CFG.margem.dias) meta.append(el("span", null, "Prazo vence em " + it.faltaDias + (it.faltaDias === 1 ? " dia" : " dias")));
+    if (it.estimada) meta.append(el("span", null, "Previsão: " + fmtMes(it.estimada)));
+    meta.append(el("span", null, "A cada " + fmtKm(it.intervalo_km) + " km ou " + it.intervalo_meses + " meses"));
+    b.append(meta);
+    li.append(b);
+    lista.append(li);
+  }
+  $("nBad").textContent = cont.bad; $("nWarn").textContent = cont.warn; $("nOk").textContent = cont.ok;
+
+  $("kmhint").textContent = kmAtual < kmUltimo
+    ? "Atenção: valor menor que o da última visita (" + fmtKm(kmUltimo) + " km)."
+    : "Digite o valor do painel para recalcular.";
+
+  const pend = itens.filter(i => i.status === "bad" || i.status === "warn").map(i => i.nome);
+  const msg = "Olá! Quero agendar manutenção do veículo " + placa + " (" + fmtKm(kmAtual) + " km)." +
+    (pend.length ? " Itens: " + pend.join(", ") + "." : "");
+  const w = CFG.oficina.whatsapp;
+  $("whats").href = "https://wa.me/" + w + "?text=" + encodeURIComponent(msg);
+  $("contatoTxt").textContent = (pend.length
+    ? pend.length + (pend.length > 1 ? " itens pedem" : " item pede") + " atenção. Fale com a oficina para agendar."
+    : "Tudo em dia. A oficina avisa quando chegar a hora.") + " WhatsApp " + U.fone(w) + ".";
+
+  try { localStorage.setItem("km:" + placa, String(kmAtual)); } catch (e) {}
+}
+
+// Cabeçalho e dados fixos
+const of = CFG.oficina;
+$("insta").href = "https://www.instagram.com/" + of.instagram + "/";
+$("instaTxt").textContent = "@" + of.instagram;
+$("whatsTopo").href = "https://wa.me/" + of.whatsapp;
+$("foneTopo").textContent = U.fone(of.whatsapp);
+$("placa").textContent = placa;
+$("detalhes").href = CFG.sobreRodas.url;
+$("detalhes").textContent = "Ver detalhes no " + CFG.sobreRodas.nome;
+$("ultData").textContent = dataUltima ? fmtData(dataUltima) : "–";
+$("ultKm").textContent = kms.length ? fmtKm(kmUltimo) + " km" : "–";
+if (!temDados) {
+  $("aviso").hidden = false;
+  $("aviso").textContent = "Exemplo de demonstração. Aproxime o celular da etiqueta NFC do veículo para ver os dados reais.";
+}
+
+let salvo = null;
+try { salvo = localStorage.getItem("km:" + placa); } catch (e) {}
+$("km").value = fmtKm(Math.max(Number(salvo) || 0, kmUltimo));
+
+$("km").addEventListener("input", e => {
+  const n = e.target.value.replace(/\D/g, "").slice(0, 7);
+  e.target.value = n ? fmtKm(Number(n)) : "";
+  render();
+});
+
+render();
+</script>
+</body>
+</html>

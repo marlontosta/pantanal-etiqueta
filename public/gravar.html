@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gravar Etiqueta NFC</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilo.css">
+
+</head>
+<body>
+<main class="wrap">
+  <header class="brandbar">
+    <img src="logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
+    <div class="brandlinks"><span style="color:var(--brand);font-weight:600">Área da oficina</span></div>
+  </header>
+
+  <section class="card">
+    <h2>1. Carregar etiqueta</h2>
+    <p class="small" style="margin:0">Se o carro já tem etiqueta, leia os dados atuais para só atualizar o que mudou. Etiqueta nova: pule para o passo 2.</p>
+    <div class="actions">
+      <button class="b" id="btnLer" type="button">Ler etiqueta NFC</button>
+    </div>
+    <div class="field">
+      <label for="colar">Ou cole o link da etiqueta</label>
+      <input id="colar" type="url" placeholder="https://…?placa=ABC1D23&amp;oleo-km=…" autocomplete="off">
+    </div>
+  </section>
+
+  <form class="card" id="form" novalidate>
+    <h2>2. Dados da visita</h2>
+    <div class="field">
+      <label for="placa">Placa</label>
+      <input id="placa" type="text" maxlength="8" autocomplete="off" placeholder="ABC1D23" style="text-transform:uppercase;font-family:var(--display);font-size:1.4rem;letter-spacing:.08em">
+    </div>
+    <div class="grid2">
+      <div class="field"><label for="visitaKm">Km de hoje</label><input id="visitaKm" type="text" inputmode="numeric" autocomplete="off" placeholder="27.350"></div>
+      <div class="field"><label for="visitaDt">Data de hoje</label><input id="visitaDt" type="date"></div>
+    </div>
+    <div class="field">
+      <label for="os">Colar itens da OS (opcional)</label>
+      <textarea id="os" rows="4" placeholder="Placa: ABC1D23&#10;KM do serviço: 27350&#10;244  TROCA DE OLEO E FILTROS COMPLETO PASSEIO  1  R$ 30,00 …"></textarea>
+      <span class="small" id="osMsg">Cole a placa, o km e os itens da ordem de serviço; os serviços reconhecidos são marcados como feitos hoje.</span>
+    </div>
+    <p class="small" style="margin:0">Marque os serviços feitos nesta visita para preencher com o km e a data de hoje. Os outros mantêm o último registro.</p>
+    <div id="servicos"></div>
+  </form>
+
+  <section class="card">
+    <h2>3. Gravar</h2>
+    <div class="field">
+      <label for="base">Endereço da página do cliente</label>
+      <input id="base" type="url" autocomplete="off" placeholder="https://seusite.com.br/etiqueta/">
+    </div>
+    <div class="field">
+      <label for="link">Link que vai na etiqueta</label>
+      <textarea id="link" rows="4" readonly></textarea>
+      <span class="small" id="tamanho"></span>
+    </div>
+    <div class="actions">
+      <button class="b primary" id="btnGravar" type="button">Gravar na etiqueta NFC</button>
+      <button class="b" id="btnCopiar" type="button">Copiar link</button>
+      <a class="b" id="btnAbrir" href="#" target="_blank" rel="noopener">Ver como o cliente</a>
+    </div>
+    <div class="msg" id="msg" hidden></div>
+    <div class="field">
+      <span class="lbl">QR code do mesmo link (alternativa à NFC)</span>
+      <div class="qr" id="qr"></div>
+    </div>
+  </section>
+
+  <footer class="small legend">
+    <div>A gravação por NFC funciona no Chrome para Android, com a página publicada em https. Em outros aparelhos, copie o link e grave com um app de NFC (por exemplo, NFC Tools), ou imprima o QR code.</div>
+    <div class="foot-links"><span>Intervalos e contato ficam no arquivo config.js.</span><a href="index.html">Página do cliente</a></div>
+  </footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script>
+const CFG = window.ETIQUETA, U = window.ETQ;
+const $ = id => document.getElementById(id);
+const fmtKm = n => n == null ? "" : n.toLocaleString("pt-BR");
+const nfc = "NDEFReader" in window;
+// Capacidade útil aproximada de cada chip para um link (bytes).
+const CHIPS = [["NTAG213", 137], ["NTAG215", 496], ["NTAG216", 868]];
+
+function aviso(tipo, texto) { const m = $("msg"); m.className = "msg " + tipo; m.textContent = texto; m.hidden = false; }
+
+// Monta as linhas de serviço
+const box = $("servicos");
+for (const s of CFG.servicos) {
+  const d = document.createElement("div");
+  d.className = "svc";
+  d.innerHTML =
+    '<div class="svc-head"><h3></h3><label class="check"><input type="checkbox" id="feito-' + s.id + '"> Feito hoje</label></div>' +
+    '<div class="grid2">' +
+    '<div class="field"><label for="km-' + s.id + '">Km</label><input id="km-' + s.id + '" type="text" inputmode="numeric" autocomplete="off"></div>' +
+    '<div class="field"><label for="dt-' + s.id + '">Data</label><input id="dt-' + s.id + '" type="date"></div>' +
+    '</div>';
+  d.querySelector("h3").textContent = s.nome;
+  box.append(d);
+}
+
+function preencherFeitos() {
+  for (const s of CFG.servicos) {
+    if (!$("feito-" + s.id).checked) continue;
+    $("km-" + s.id).value = $("visitaKm").value;
+    $("dt-" + s.id).value = $("visitaDt").value;
+  }
+}
+
+// Marcar guarda o valor anterior; desmarcar devolve.
+function marcar(cb) {
+  const id = cb.id.replace("feito-", ""), km = $("km-" + id), dt = $("dt-" + id);
+  if (cb.checked) { cb.dataset.km = km.value; cb.dataset.dt = dt.value; preencherFeitos(); }
+  else { km.value = cb.dataset.km || ""; dt.value = cb.dataset.dt || ""; }
+}
+
+// Lê o texto colado da OS: placa e serviços reconhecidos pelos trechos "os" do config.js.
+function lerOS(texto) {
+  const t = texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+  const mp = t.match(/PLACA\s*:?\s*([A-Z]{3}-?\d[A-Z0-9]\d{2})/);
+  if (mp) $("placa").value = U.placa(mp[1]);
+  const mk = t.match(/\bKM\b[^:\n]*:\s*([\d.]+)/);
+  if (mk) $("visitaKm").value = fmtKm(U.km(mk[1]));
+  const achados = [];
+  for (const s of CFG.servicos) {
+    if (!(s.os || []).some(k => t.includes(k))) continue;
+    achados.push(s.nome);
+    const cb = $("feito-" + s.id);
+    if (!cb.checked) { cb.checked = true; marcar(cb); }
+  }
+  preencherFeitos();
+  $("osMsg").textContent = (mp ? "Placa " + U.placa(mp[1]) + ". " : "Placa não encontrada. ") +
+    (achados.length ? "Marcados: " + achados.join(", ") + "." : "Nenhum serviço da etiqueta encontrado.") +
+    ($("visitaKm").value ? "" : " Falta o km de hoje.");
+}
+
+function montarLink() {
+  const p = [];
+  const placa = U.placa($("placa").value);
+  if (placa) p.push("placa=" + placa);
+  for (const s of CFG.servicos) {
+    const km = U.km($("km-" + s.id).value);
+    const dt = $("dt-" + s.id).value;
+    if (km != null) p.push(s.km + "=" + km);
+    if (dt) p.push(s.dt + "=" + dt);
+  }
+  let base = $("base").value.trim() || "https://seusite.com.br/etiqueta/";
+  base = base.split("?")[0];
+  return base + (p.length ? "?" + p.join("&") : "");
+}
+
+function atualizar() {
+  const url = montarLink();
+  $("link").value = url;
+  $("btnAbrir").href = url;
+  // NDEF guarda "https://" em 1 byte, mais uns 7 bytes de cabeçalho
+  const bytes = new TextEncoder().encode(url.replace(/^https?:\/\/(www\.)?/, "")).length + 8;
+  const cabe = CHIPS.filter(c => bytes <= c[1]).map(c => c[0]);
+  $("tamanho").textContent = bytes + " bytes. " + (cabe.length ? "Cabe em: " + cabe.join(", ") + "." : "Grande demais para as etiquetas comuns.");
+  const ok = U.placa($("placa").value).length === 7;
+  $("btnGravar").disabled = !ok;
+  $("btnGravar").title = ok ? "" : "Informe a placa com 7 caracteres";
+  const q = $("qr"); q.replaceChildren();
+  if (window.QRCode) new QRCode(q, { text: url, width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
+  else q.textContent = "O QR code precisa de internet para aparecer.";
+  try { localStorage.setItem("etq:base", $("base").value.trim()); } catch (e) {}
+}
+
+function carregar(url) {
+  let p;
+  try { p = new URL(url).searchParams; } catch (e) { aviso("bad", "Esse link não parece válido. Confira se ele começa com https://"); return; }
+  $("placa").value = U.placa(p.get("placa"));
+  for (const s of CFG.servicos) {
+    $("km-" + s.id).value = fmtKm(U.km(p.get(s.km)));
+    const d = U.data(p.get(s.dt));
+    $("dt-" + s.id).value = d ? U.iso(d) : "";
+    $("feito-" + s.id).checked = false;
+  }
+  if (!$("base").value.trim()) $("base").value = url.split("?")[0];
+  atualizar();
+  aviso("ok", "Dados da etiqueta carregados" + ($("placa").value ? " para a placa " + $("placa").value : "") + ". Marque o que foi feito hoje e grave.");
+}
+
+// Ler etiqueta
+$("btnLer").addEventListener("click", async () => {
+  if (!nfc) { aviso("warn", "Este navegador não lê NFC. Use o Chrome no Android ou cole o link da etiqueta abaixo."); return; }
+  try {
+    const leitor = new NDEFReader();
+    const ctrl = new AbortController();
+    await leitor.scan({ signal: ctrl.signal });
+    aviso("warn", "Aproxime a etiqueta do celular…");
+    leitor.onreadingerror = () => aviso("bad", "Não consegui ler a etiqueta. Tente segurar o celular parado sobre ela.");
+    leitor.onreading = ev => {
+      ctrl.abort();
+      const rec = ev.message.records.find(r => r.recordType === "url" || r.recordType === "absolute-url");
+      if (!rec) { aviso("bad", "A etiqueta não tem um link gravado. Para etiqueta nova, preencha os dados e grave."); return; }
+      carregar(new TextDecoder().decode(rec.data));
+    };
+  } catch (e) {
+    aviso("bad", "O acesso à NFC foi negado ou não está disponível (" + e.name + "). Confira se a NFC do celular está ligada.");
+  }
+});
+
+$("colar").addEventListener("change", e => { if (e.target.value.trim()) carregar(e.target.value.trim()); });
+
+// Gravar etiqueta
+$("btnGravar").addEventListener("click", async () => {
+  const url = montarLink();
+  if (!nfc) { aviso("warn", "Este navegador não grava NFC. Copie o link e grave com um app de NFC, ou use o Chrome no Android."); return; }
+  try {
+    aviso("warn", "Aproxime a etiqueta do celular para gravar…");
+    await new NDEFReader().write({ records: [{ recordType: "url", data: url }] }, { overwrite: true });
+    aviso("ok", "Etiqueta gravada para a placa " + U.placa($("placa").value) + ". Encoste de novo para conferir a página.");
+  } catch (e) {
+    aviso("bad", "Não gravou (" + e.name + "). Confira se a etiqueta não está bloqueada e se tem espaço para " + $("tamanho").textContent.split(".")[0] + ".");
+  }
+});
+
+$("btnCopiar").addEventListener("click", () => {
+  const t = $("link");
+  navigator.clipboard.writeText(t.value)
+    .then(() => aviso("ok", "Link copiado."))
+    .catch(() => { t.focus(); t.select(); aviso("warn", "Selecionei o link. Use Copiar do seu aparelho."); });
+});
+
+// Entradas
+$("form").addEventListener("input", e => {
+  const t = e.target;
+  if (t.id === "os") lerOS(t.value);
+  if (t.inputMode === "numeric") { const n = U.km(t.value); t.value = n == null ? "" : fmtKm(Math.min(n, 9999999)); }
+  if (t.id === "placa") t.value = U.placa(t.value);
+  if (t.type === "checkbox") marcar(t);
+  if (t.id === "visitaKm" || t.id === "visitaDt") preencherFeitos();
+  atualizar();
+});
+$("form").addEventListener("submit", e => e.preventDefault());
+$("base").addEventListener("input", atualizar);
+
+// Estado inicial
+$("visitaDt").value = U.iso(new Date());
+let base = "";
+try { base = localStorage.getItem("etq:base") || ""; } catch (e) {}
+if (!base && /^https:/.test(location.href) && !/claude\.ai|claudeusercontent/.test(location.host)) base = new URL("./", location.href).href;
+$("base").value = base;
+if (!nfc) $("btnGravar").textContent = "Gravar na etiqueta NFC (só Chrome Android)";
+atualizar();
+</script>
+</body>
+</html>

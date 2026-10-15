@@ -1,0 +1,139 @@
+/* Layout: uma coluna estreita como a etiqueta colada no para-brisa; campo de km fixo no topo, itens ordenados por urgência. */
+:root {
+  --bg: #e8ecea;
+  --sticker: #ffffff;
+  --ink: #15202b;
+  --muted: #5a6875;
+  --line: #d3dade;
+  --accent: #137a4c;
+  --accent-ink: #ffffff;
+  --brand: #22b672;
+  --brand-black: #000000;
+  --brand-on: #f2f5f3;
+  --ok: #1f8a4c;
+  --ok-bg: #e3f4ea;
+  --warn: #b7791f;
+  --warn-bg: #fbf0d9;
+  --bad: #c0392b;
+  --bad-bg: #fbe4e1;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1311; --sticker: #171e1b; --ink: #e6ecf0; --muted: #94a3b0; --line: #2a3742;
+  --accent: #3fcb8a; --accent-ink: #0f161c;
+  --ok: #4cc283; --ok-bg: #16301f; --warn: #e8b04f; --warn-bg: #36290f; --bad: #f0786a; --bad-bg: #3a1a17;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e1311; --sticker: #171e1b; --ink: #e6ecf0; --muted: #94a3b0; --line: #2a3742;
+  --accent: #3fcb8a; --accent-ink: #0f161c;
+  --ok: #4cc283; --ok-bg: #16301f; --warn: #e8b04f; --warn-bg: #36290f; --bad: #f0786a; --bad-bg: #3a1a17;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.45 var(--body); }
+.wrap { max-width: 640px; margin: 0 auto; padding: 16px 16px 40px; display: grid; gap: 16px; }
+h1, h2, .num, .label-head { font-family: var(--display); }
+.tab { font-variant-numeric: tabular-nums; }
+
+/* Faixa da marca */
+.brandbar { background: var(--brand-black); color: var(--brand-on); border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brandbar img { display: block; width: 190px; max-width: 100%; height: auto; }
+.brandlinks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .9rem; }
+.brandlinks a { color: var(--brand); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.brandlinks a:hover { text-decoration: underline; }
+.brandlinks a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.brandlinks svg { width: 18px; height: 18px; fill: currentColor; }
+
+/* Etiqueta principal */
+.sticker { background: var(--sticker); border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 6px 20px rgb(0 0 0 / .05); padding: 18px; display: grid; gap: 14px; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.05; text-wrap: balance; }
+.sub { color: var(--muted); font-size: .95rem; margin-top: 2px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; margin: 0; }
+.facts div { border-bottom: 1px solid var(--line); padding-bottom: 6px; min-width: 0; }
+.facts dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.facts dd { margin: 0; font-family: var(--display); font-size: 1.35rem; font-weight: 600; }
+
+/* Campo de km */
+.kmbox { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--brand-black); color: var(--brand-on); border: 2px solid var(--brand); border-radius: 14px; padding: 14px 16px; display: grid; gap: 6px; }
+.kmbox label { color: var(--brand); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.kmrow { display: flex; align-items: center; gap: 10px; }
+.kmrow input { flex: 1; min-width: 0; font: 600 1.8rem/1 var(--display); padding: 8px 12px; border-radius: 10px; border: 0; background: var(--sticker); color: var(--ink); font-variant-numeric: tabular-nums; }
+.kmrow input:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.kmrow span { font: 600 1.4rem var(--display); }
+.kmhint { font-size: .85rem; opacity: .9; }
+
+/* Resumo */
+.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.chip { border-radius: 10px; padding: 8px 10px; display: flex; align-items: baseline; gap: 8px; font-weight: 500; font-size: .9rem; }
+.chip .num { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+.chip.bad { background: var(--bad-bg); color: var(--bad); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+
+/* Lista de manutenções */
+.label-head { justify-self: center; background: var(--ink); color: var(--sticker); font-size: .95rem; font-weight: 600; letter-spacing: .06em; padding: 3px 12px; text-transform: uppercase; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; }
+.item { display: grid; grid-template-columns: 14px 1fr; gap: 4px 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.item:first-child { border-top: 0; }
+.dot { width: 14px; height: 14px; border-radius: 50%; margin-top: 22px; }
+.ok .dot { background: var(--ok); } .warn .dot { background: var(--warn); } .bad .dot { background: var(--bad); }
+.body { min-width: 0; display: grid; gap: 4px; }
+.row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.row1 h2 { margin: 0; font-size: 1.3rem; font-weight: 600; }
+.ttl { display: grid; min-width: 0; }
+.grp { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.pill { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.ok .pill { background: var(--ok-bg); color: var(--ok); } .warn .pill { background: var(--warn-bg); color: var(--warn); } .bad .pill { background: var(--bad-bg); color: var(--bad); }
+.next { font-family: var(--display); font-size: 1.15rem; font-weight: 600; }
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 3px; }
+.ok .bar i { background: var(--ok); } .warn .bar i { background: var(--warn); } .bad .bar i { background: var(--bad); }
+.meta { color: var(--muted); font-size: .88rem; display: flex; flex-wrap: wrap; gap: 2px 14px; }
+
+/* Rodapé */
+.contact { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: #1fa855; color: #fff; text-decoration: none; font-weight: 600; padding: 10px 16px; border-radius: 10px; }
+.btn svg { width: 20px; height: 20px; fill: currentColor; }
+.btn:focus-visible, .linkbtn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.small { font-size: .85rem; color: var(--muted); }
+.legend { display: grid; gap: 4px; }
+.legend b { font-weight: 600; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.notice { background: var(--warn-bg); color: var(--warn); border-radius: 10px; padding: 8px 12px; font-size: .9rem; }
+@media (max-width: 380px) { .summary { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .3s ease; } }
+
+/* Placa no padrão Mercosul */
+.plate { margin: 0; border: 2px solid var(--ink); border-radius: 8px; padding: 0; overflow: hidden; background: #fff; color: #111; display: inline-grid; min-width: 150px; text-align: center; }
+.plate::before { content: "BRASIL"; display: block; background: #0b3a8c; color: #fff; font: 600 .6rem/1.5 var(--body); letter-spacing: .25em; }
+.plate span { display: block; font: 700 1.9rem/1.1 var(--display); letter-spacing: .1em; padding: 2px 12px 4px; }
+.kicker { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.none .dot { background: var(--line); } .none .pill { background: var(--line); color: var(--muted); } .none .bar i { background: var(--muted); }
+.foot-links { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.foot-links a { color: var(--accent); }
+
+/* Tela de gravação */
+.card { background: var(--sticker); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; }
+.card h2 { margin: 0; font-family: var(--display); font-size: 1.35rem; font-weight: 600; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label, .field .lbl { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.field input, .field textarea { font: 500 1.05rem var(--body); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-width: 0; width: 100%; }
+.field textarea { font: .85rem/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; word-break: break-all; }
+.field input:focus-visible, .field textarea:focus-visible { outline: 3px solid var(--brand); outline-offset: 1px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.svc { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px; }
+.svc-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.svc-head h3 { margin: 0; font: 600 1.15rem var(--display); }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; font-weight: 500; cursor: pointer; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.b { font: 600 1rem var(--body); padding: 11px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--sticker); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.b.primary { background: var(--brand-black); color: var(--brand); border-color: var(--brand); }
+.b:disabled { opacity: .5; cursor: not-allowed; }
+.b:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.msg { border-radius: 10px; padding: 10px 12px; font-size: .92rem; }
+.msg.ok { background: var(--ok-bg); color: var(--ok); } .msg.warn { background: var(--warn-bg); color: var(--warn); } .msg.bad { background: var(--bad-bg); color: var(--bad); }
+.qr { justify-self: start; background: #fff; padding: 10px; border-radius: 10px; }
+.qr img, .qr canvas { display: block; width: 168px; height: 168px; }
