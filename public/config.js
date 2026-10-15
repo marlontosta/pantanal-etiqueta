@@ -12,6 +12,8 @@ window.ETIQUETA = {
   // "os": trechos que identificam o serviço na descrição dos itens da OS (sem acento, maiúsculas).
   servicos: [
     { id: "oleo", nome: "Troca de óleo e filtro", grupo: "Óleo e filtros", km: "oleo-km", dt: "oleo-dt", intervalo_km: 10000, intervalo_meses: 12, os: ["TROCA DE OLEO"] },
+    { id: "rev", nome: "Revisão mecânica", grupo: "Suspensão, freios e demais itens mecânicos", km: "rev-km", dt: "rev-dt", intervalo_km: 10000, intervalo_meses: 12,
+      os: ["REVISAO", "SUSPENS", "FREIO", "AMORTECEDOR", "BIELETA", "TERMINAL", "BANDEJA", "PASTILHA", "AXIAL"] },
     // Geometria = alinhamento + balanceamento. "antigos": parâmetros de etiquetas gravadas antes da junção.
     { id: "geo", nome: "Geometria (alinhamento e balanceamento)", grupo: "Pneus e rodas", km: "geo-km", dt: "geo-dt", intervalo_km: 10000, intervalo_meses: 6, os: ["ALINHAMENTO", "BALANCEAMENTO", "GEOMETRIA"],
       antigos: [["alinhamento-km", "alinhamento-dt"], ["balanceamento-km", "balanceamento-dt"]] },
