@@ -8,7 +8,7 @@ import sys
 
 PORTA = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 PASTA = pathlib.Path(__file__).resolve().parent / "public"
-EXEMPLO = "?placa=LMV4G22&oleo-km=95178&oleo-dt=2026-10-15&alinhamento-km=95178&alinhamento-dt=2026-10-15"
+EXEMPLO = "?placa=LMV4G22&oleo-km=95178&oleo-dt=2026-10-15&geo-km=95178&geo-dt=2026-10-15"
 
 
 def ip_da_rede():

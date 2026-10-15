@@ -26,10 +26,8 @@ Exemplo: `https://seusite.com.br/etiqueta/?placa=ABC1D23&oleo-km=27350&oleo-dt=2
 | `placa`            | Placa do veículo (7 caracteres, sem hífen)    |
 | `oleo-km`          | Km da última troca de óleo e filtro           |
 | `oleo-dt`          | Data da última troca de óleo e filtro         |
-| `alinhamento-km`   | Km do último alinhamento                      |
-| `alinhamento-dt`   | Data do último alinhamento                    |
-| `balanceamento-km` | Km do último balanceamento                    |
-| `balanceamento-dt` | Data do último balanceamento                  |
+| `geo-km`           | Km da última geometria (alinhamento e balanceamento) |
+| `geo-dt`           | Data da última geometria                      |
 | `hig-km`           | Km da última higienização do ar-condicionado  |
 | `hig-ar-dt`        | Data da última higienização do ar-condicionado|
 
@@ -37,6 +35,7 @@ Exemplo: `https://seusite.com.br/etiqueta/?placa=ABC1D23&oleo-km=27350&oleo-dt=2
 - Km aceita só números (pontos são ignorados).
 - Qualquer parâmetro pode faltar; o serviço aparece como "Sem registro".
 - Sem nenhum parâmetro, `index.html` mostra um exemplo de demonstração.
+- Etiquetas antigas com `alinhamento-km/-dt` e `balanceamento-km/-dt` continuam funcionando: sem `geo-*`, a página usa o mais antigo dos dois registros como geometria. Ao regravar pela área da oficina, o link passa a usar `geo-*`.
 
 Os nomes dos parâmetros, intervalos (km e meses) e margens de aviso ficam em `public/config.js`.
 Mudar um nome de parâmetro ali invalida as etiquetas já gravadas com o nome antigo.
@@ -46,12 +45,12 @@ Mudar um nome de parâmetro ali invalida as etiquetas já gravadas com o nome an
 Em `gravar.html`, cole no campo "Colar itens da OS" a placa, o km e os itens da ordem de serviço.
 A página reconhece `Placa: LMV4G22`, `KM do serviço: 95178` e marca como feitos hoje os
 serviços cujas descrições contêm os trechos do campo `os` de cada serviço no `config.js`
-(`TROCA DE OLEO`, `ALINHAMENTO`, `BALANCEAMENTO`, `HIGIENIZ`). Os demais itens da OS são ignorados.
+(`TROCA DE OLEO`; `ALINHAMENTO`, `BALANCEAMENTO` ou `GEOMETRIA`; `HIGIENIZ`). Os demais itens da OS são ignorados.
 
-Exemplo: uma OS com troca de óleo e alinhamento em 15/10/2026 com 95.178 km gera
+Exemplo: uma OS com troca de óleo e alinhamento (que conta como geometria) em 15/10/2026 com 95.178 km gera
 
 ```
-?placa=LMV4G22&oleo-km=95178&oleo-dt=2026-10-15&alinhamento-km=95178&alinhamento-dt=2026-10-15
+?placa=LMV4G22&oleo-km=95178&oleo-dt=2026-10-15&geo-km=95178&geo-dt=2026-10-15
 ```
 
 ## Link para o Sobre Rodas

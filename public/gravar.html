@@ -174,8 +174,9 @@ function carregar(url) {
   try { p = new URL(url).searchParams; } catch (e) { aviso("bad", "Esse link não parece válido. Confira se ele começa com https://"); return; }
   $("placa").value = U.placa(p.get("placa"));
   for (const s of CFG.servicos) {
-    $("km-" + s.id).value = fmtKm(U.km(p.get(s.km)));
-    const d = U.data(p.get(s.dt));
+    const r = U.ler(p, s);
+    $("km-" + s.id).value = fmtKm(U.km(r.km));
+    const d = U.data(r.dt);
     $("dt-" + s.id).value = d ? U.iso(d) : "";
     $("feito-" + s.id).checked = false;
   }

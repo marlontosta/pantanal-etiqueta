@@ -12,8 +12,9 @@ window.ETIQUETA = {
   // "os": trechos que identificam o serviço na descrição dos itens da OS (sem acento, maiúsculas).
   servicos: [
     { id: "oleo", nome: "Troca de óleo e filtro", grupo: "Óleo e filtros", km: "oleo-km", dt: "oleo-dt", intervalo_km: 10000, intervalo_meses: 12, os: ["TROCA DE OLEO"] },
-    { id: "alinhamento", nome: "Alinhamento", grupo: "Pneus e rodas", km: "alinhamento-km", dt: "alinhamento-dt", intervalo_km: 10000, intervalo_meses: 6, os: ["ALINHAMENTO"] },
-    { id: "balanceamento", nome: "Balanceamento", grupo: "Pneus e rodas", km: "balanceamento-km", dt: "balanceamento-dt", intervalo_km: 10000, intervalo_meses: 6, os: ["BALANCEAMENTO"] },
+    // Geometria = alinhamento + balanceamento. "antigos": parâmetros de etiquetas gravadas antes da junção.
+    { id: "geo", nome: "Geometria (alinhamento e balanceamento)", grupo: "Pneus e rodas", km: "geo-km", dt: "geo-dt", intervalo_km: 10000, intervalo_meses: 6, os: ["ALINHAMENTO", "BALANCEAMENTO", "GEOMETRIA"],
+      antigos: [["alinhamento-km", "alinhamento-dt"], ["balanceamento-km", "balanceamento-dt"]] },
     { id: "hig", nome: "Higienização do ar-condicionado", grupo: "Ar-condicionado", km: "hig-km", dt: "hig-ar-dt", intervalo_km: 10000, intervalo_meses: 12, os: ["HIGIENIZ"] }
   ],
   // Amarelo: faltam até 10% do intervalo ou 3.000 km (o menor), ou até 30 dias.
@@ -34,6 +35,14 @@ window.ETQ = {
   },
   iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); },
   km(s) { const n = parseInt(String(s || "").replace(/\D/g, ""), 10); return isNaN(n) ? null : n; },
+  // Último registro de um serviço no link: {km, dt} como texto. Sem os parâmetros atuais,
+  // usa os antigos e fica com o registro mais antigo, para o aviso não atrasar.
+  ler(p, s) {
+    if (p.get(s.km) || p.get(s.dt)) return { km: p.get(s.km), dt: p.get(s.dt) };
+    const regs = (s.antigos || []).map(([k, d]) => ({ km: p.get(k), dt: p.get(d) })).filter(r => r.km || r.dt);
+    regs.sort((a, b) => (this.data(a.dt) || 0) - (this.data(b.dt) || 0) || (this.km(a.km) || 0) - (this.km(b.km) || 0));
+    return regs[0] || { km: null, dt: null };
+  },
   placa(s) { return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7); },
   fone(n) {
     const d = String(n).replace(/\D/g, "").replace(/^55/, "");
