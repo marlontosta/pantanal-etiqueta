@@ -37,9 +37,9 @@ h1, h2, .num, .label-head { font-family: var(--display); }
 .tab { font-variant-numeric: tabular-nums; }
 
 /* Faixa da marca */
-.brandbar { background: var(--brand-black); color: var(--brand-on); border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brandbar { background: var(--brand-black); color: var(--brand-on); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
 .brandbar img { display: block; width: 190px; max-width: 100%; height: auto; }
-.brandlinks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .9rem; }
+.brandlinks { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-size: .9rem; }
 .brandlinks a { color: var(--brand); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
 .brandlinks a:hover { text-decoration: underline; }
 .brandlinks a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
