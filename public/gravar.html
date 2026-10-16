@@ -174,7 +174,7 @@ function atualizar() {
 function carregar(url) {
   let p;
   try { p = new URL(url).searchParams; } catch (e) { aviso("bad", "Esse link não parece válido. Confira se ele começa com https://"); return; }
-  $("placa").value = U.placa(U.lerPlaca(p));
+  $("placa").value = U.placa(p.get("p"));
   for (const s of CFG.servicos) {
     const r = U.ler(p, s);
     $("km-" + s.id).value = fmtKm(U.km(r.km));

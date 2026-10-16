@@ -87,10 +87,10 @@ const TEXTO = { bad: "Vencida", warn: "Próxima", ok: "Em dia", none: "Sem regis
 const EXEMPLO = "p=ABC1D23&o=l3q.1rz&g=gtk.1ng&h=o";
 
 let params = new URLSearchParams(location.search);
-const temDados = U.lerPlaca(params) || CFG.servicos.some(s => { const r = U.ler(params, s); return r.km || r.dt; });
+const temDados = params.get("p") || CFG.servicos.some(s => { const r = U.ler(params, s); return r.km || r.dt; });
 if (!temDados) params = new URLSearchParams(EXEMPLO);
 
-const placa = U.placa(U.lerPlaca(params)) || "–";
+const placa = U.placa(params.get("p")) || "–";
 const registros = CFG.servicos.map(s => { const r = U.ler(params, s); return { ...s, ultKm: U.km(r.km), ultData: U.data(r.dt) }; });
 
 // Visita mais recente: maior km e data mais recente entre os serviços.

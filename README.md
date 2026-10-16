@@ -19,7 +19,7 @@ etiqueta/
 
 ## Parâmetros do link
 
-Formato compacto, para caber nas etiquetas menores:
+Formato compacto, para caber nas etiquetas menores. Os nomes e valores são estes:
 
 ```
 https://marlontosta.github.io/pantanal-etiqueta/?p=LMV4G22&o=21fu.1wv&r=o&g=o
@@ -41,11 +41,6 @@ que é o caso comum de vários serviços feitos na mesma visita.
 - A área da oficina monta esse formato sozinha; não é preciso calcular à mão.
 - Qualquer serviço pode faltar; ele aparece como "Sem registro".
 - Sem nenhum parâmetro, `index.html` mostra um exemplo de demonstração.
-
-**Formato longo antigo**, ainda lido para etiquetas já gravadas: `placa`, `oleo-km`, `oleo-dt`,
-`rev-km`, `rev-dt`, `geo-km`, `geo-dt`, `hig-km`, `hig-ar-dt` (e, de antes da geometria,
-`alinhamento-*` e `balanceamento-*`, usando o mais antigo dos dois). Ao regravar pela área
-da oficina, a etiqueta passa para o formato compacto.
 
 As letras, intervalos (km e meses) e margens de aviso ficam em `public/config.js`.
 Mudar a letra de um serviço invalida as etiquetas já gravadas com a letra antiga.
