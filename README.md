@@ -19,28 +19,36 @@ etiqueta/
 
 ## Parâmetros do link
 
-Exemplo: `https://seusite.com.br/etiqueta/?placa=ABC1D23&oleo-km=27350&oleo-dt=2026-04-22`
+Formato compacto, para caber nas etiquetas menores:
 
-| Parâmetro          | Significado                                   |
-|--------------------|-----------------------------------------------|
-| `placa`            | Placa do veículo (7 caracteres, sem hífen)    |
-| `oleo-km`          | Km da última troca de óleo e filtro           |
-| `oleo-dt`          | Data da última troca de óleo e filtro         |
-| `rev-km`           | Km da última revisão mecânica (suspensão, freios e demais itens) |
-| `rev-dt`           | Data da última revisão mecânica               |
-| `geo-km`           | Km da última geometria (alinhamento e balanceamento) |
-| `geo-dt`           | Data da última geometria                      |
-| `hig-km`           | Km da última higienização do ar-condicionado  |
-| `hig-ar-dt`        | Data da última higienização do ar-condicionado|
+```
+https://marlontosta.github.io/pantanal-etiqueta/?p=LMV4G22&o=21fu.1wv&r=o&g=o
+```
 
-- Datas aceitas: `2026-04-22`, `22/04/2026`, `22-04-2026` ou `20260422`. A página da oficina grava sempre `AAAA-MM-DD`.
-- Km aceita só números (pontos são ignorados).
-- Qualquer parâmetro pode faltar; o serviço aparece como "Sem registro".
+| Parâmetro | Significado                                              |
+|-----------|----------------------------------------------------------|
+| `p`       | Placa do veículo (7 caracteres, sem hífen)               |
+| `o`       | Troca de óleo e filtro                                   |
+| `r`       | Revisão mecânica (suspensão, freios e demais itens)      |
+| `g`       | Geometria (alinhamento e balanceamento)                  |
+| `h`       | Higienização do ar-condicionado                          |
+
+Cada serviço vale `KM.DIA`, os dois em base 36: km rodado e dias desde 01/01/2020.
+`21fu.1wv` é 95.178 km em 15/10/2026. `KM.` guarda só o km e `.DIA` só a data.
+Um valor sem ponto repete outro serviço: `r=o` quer dizer "mesmo km e data da troca de óleo",
+que é o caso comum de vários serviços feitos na mesma visita.
+
+- A área da oficina monta esse formato sozinha; não é preciso calcular à mão.
+- Qualquer serviço pode faltar; ele aparece como "Sem registro".
 - Sem nenhum parâmetro, `index.html` mostra um exemplo de demonstração.
-- Etiquetas antigas com `alinhamento-km/-dt` e `balanceamento-km/-dt` continuam funcionando: sem `geo-*`, a página usa o mais antigo dos dois registros como geometria. Ao regravar pela área da oficina, o link passa a usar `geo-*`.
 
-Os nomes dos parâmetros, intervalos (km e meses) e margens de aviso ficam em `public/config.js`.
-Mudar um nome de parâmetro ali invalida as etiquetas já gravadas com o nome antigo.
+**Formato longo antigo**, ainda lido para etiquetas já gravadas: `placa`, `oleo-km`, `oleo-dt`,
+`rev-km`, `rev-dt`, `geo-km`, `geo-dt`, `hig-km`, `hig-ar-dt` (e, de antes da geometria,
+`alinhamento-*` e `balanceamento-*`, usando o mais antigo dos dois). Ao regravar pela área
+da oficina, a etiqueta passa para o formato compacto.
+
+As letras, intervalos (km e meses) e margens de aviso ficam em `public/config.js`.
+Mudar a letra de um serviço invalida as etiquetas já gravadas com a letra antiga.
 
 ## Montar o link a partir da OS
 
@@ -52,7 +60,7 @@ serviços cujas descrições contêm os trechos do campo `os` de cada serviço n
 Exemplo: uma OS com troca de óleo, peças de suspensão (revisão mecânica) e alinhamento (geometria) em 15/10/2026 com 95.178 km gera
 
 ```
-?placa=LMV4G22&oleo-km=95178&oleo-dt=2026-10-15&rev-km=95178&rev-dt=2026-10-15&geo-km=95178&geo-dt=2026-10-15
+?p=LMV4G22&o=21fu.1wv&r=o&g=o
 ```
 
 ## Link para o Sobre Rodas
@@ -63,8 +71,10 @@ enviado. O endereço fica em `sobreRodas.url` no `config.js`.
 
 ## Tamanho da etiqueta
 
-Um link com os quatro serviços tem cerca de 210 bytes (varia com o domínio). Use **NTAG215** ou **NTAG216**; a NTAG213 (137 bytes)
-só comporta links curtos. A página `gravar.html` mostra o tamanho e em quais chips cabe.
+O link do exemplo acima tem 77 bytes na etiqueta; com os quatro serviços em datas diferentes,
+cerca de 100. Os dois cabem na **NTAG213** (137 bytes), a etiqueta mais barata. A maior parte
+é o endereço `marlontosta.github.io/pantanal-etiqueta/` (40 caracteres); um domínio próprio
+curto encurtaria ainda mais. A página `gravar.html` mostra o tamanho e em quais chips cabe.
 
 ## Hospedagem (precisa ser https)
 

@@ -23,7 +23,7 @@
     </div>
     <div class="field">
       <label for="colar">Ou cole o link da etiqueta</label>
-      <input id="colar" type="url" placeholder="https://…?placa=ABC1D23&amp;oleo-km=…" autocomplete="off">
+      <input id="colar" type="url" placeholder="https://…?p=ABC1D23&amp;o=…" autocomplete="off">
     </div>
   </section>
 
@@ -140,12 +140,14 @@ function lerOS(texto) {
 function montarLink() {
   const p = [];
   const placa = U.placa($("placa").value);
-  if (placa) p.push("placa=" + placa);
+  if (placa) p.push("p=" + placa);
+  const feitos = {};
   for (const s of CFG.servicos) {
-    const km = U.km($("km-" + s.id).value);
-    const dt = $("dt-" + s.id).value;
-    if (km != null) p.push(s.km + "=" + km);
-    if (dt) p.push(s.dt + "=" + dt);
+    const v = U.codificar(U.km($("km-" + s.id).value), $("dt-" + s.id).value);
+    if (!v) continue;
+    // Mesmo km e data de um serviço anterior: só aponta para ele.
+    p.push(s.c + "=" + (feitos[v] || v));
+    feitos[v] = feitos[v] || s.c;
   }
   let base = $("base").value.trim() || "https://seusite.com.br/etiqueta/";
   base = base.split("?")[0];
@@ -172,7 +174,7 @@ function atualizar() {
 function carregar(url) {
   let p;
   try { p = new URL(url).searchParams; } catch (e) { aviso("bad", "Esse link não parece válido. Confira se ele começa com https://"); return; }
-  $("placa").value = U.placa(p.get("placa"));
+  $("placa").value = U.placa(U.lerPlaca(p));
   for (const s of CFG.servicos) {
     const r = U.ler(p, s);
     $("km-" + s.id).value = fmtKm(U.km(r.km));
