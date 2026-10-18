@@ -9,6 +9,7 @@ def cliente(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "BANCO", tmp_path / "teste.db")
     monkeypatch.setattr(config, "COOKIE_SEGURO", False)
     seguranca._falhas.clear()
+    main._envios.clear()
     db.criar_tabelas()
     with db.transacao() as con:
         con.execute("INSERT INTO usuarios (usuario, nome, senha_hash) VALUES ('marlon', 'Marlon', ?)",

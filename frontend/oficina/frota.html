@@ -50,7 +50,7 @@
   </div>
 
   <footer class="small legend">
-    <div>Km/dia é a média entre a primeira e a última visita com km (com pelo menos 7 dias entre elas). Km atual é o último km mais essa média vezes os dias desde a visita (marcado "est.").</div>
+    <div>Km/dia é a média entre o primeiro e o último km conhecido (com pelo menos 7 dias entre eles). Contam os km das visitas e os que o cliente digita na página da etiqueta. Km atual é o último km mais essa média vezes os dias desde então (marcado "est."); "cliente" quer dizer que o último km veio do cliente.</div>
     <div>Previsão é a data mais próxima entre o prazo em meses e o dia estimado em que o carro chega no km da próxima troca. Clique numa linha para ver todos os serviços e o histórico.</div>
   </footer>
 </main>
@@ -75,6 +75,11 @@ const COLS = [
   { k: "kmatual", t: "Km atual", n: 1, v: x => x.v.km_atual, f: x => {
       const s = el("span", null, fmtKm(x.v.km_atual));
       if (x.v.km_estimado) s.append(" ", el("span", "est", "est."));
+      if (x.v.km_do_cliente) {
+        const c = el("span", "est cli", "cliente");
+        c.title = "Base: " + fmtKm(x.v.km_referencia) + " km informados pelo cliente em " + fmtData(x.v.km_referencia_data);
+        s.append(" ", c);
+      }
       return s;
     } },
   { k: "servico", t: "Próxima manutenção", w: 1, v: x => x.s?.nome, f: x => x.s?.nome || "–" },
@@ -192,8 +197,8 @@ function detalhe(v) {
     tb.append(r);
   }
   t.append(tb);
-  const hist = el("p", "small", "Carregando histórico…");
-  td.append(t, hist);
+  const hist = el("p", "small", "Carregando histórico…"), leit = el("p", "small");
+  td.append(t, hist, leit);
   tr.append(td);
   OFICINA.api("/api/veiculos/" + v.placa).then(d => {
     const nomes = Object.fromEntries(CFG.servicos.map(s => [s.id, s.nome]));
@@ -201,6 +206,9 @@ function detalhe(v) {
     for (const r of d.historico) (porData[r.data] ||= { km: r.km, itens: [] }).itens.push(nomes[r.servico] || r.servico);
     hist.textContent = "Histórico: " + Object.entries(porData).map(([dt, x]) =>
       fmtData(dt) + (x.km != null ? " (" + fmtKm(x.km) + " km)" : "") + ": " + x.itens.join(", ")).join(" · ");
+    // Km que o cliente digitou na página da etiqueta; os que não batem com as visitas ficam fora da conta.
+    if (d.leituras.length) leit.textContent = "Km informado pelo cliente: " + d.leituras.map(l =>
+      fmtData(l.data) + " " + fmtKm(l.km) + " km" + (l.usada ? "" : " (ignorado, não bate com as visitas)")).join(" · ");
   }).catch(e => { hist.textContent = "Não carregou o histórico: " + e.message; });
   return tr;
 }

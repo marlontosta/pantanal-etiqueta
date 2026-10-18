@@ -75,3 +75,31 @@ def test_validacao(logado):
     assert logado.post("/api/registros", json={"placa": "ABC1234", "servicos": [{"servico": "motor", "data": "2026-01-01"}]}).status_code == 422
     assert logado.post("/api/registros", json={"placa": "ABC1234", "servicos": [{"servico": "oleo", "data": futuro}]}).status_code == 422
     assert logado.get("/api/veiculos/ZZZ9Z99").status_code == 404
+
+
+def test_km_do_cliente(cliente, logado):
+    antes = (config.hoje() - timedelta(days=50)).isoformat()
+    logado.post("/api/registros", json={"placa": "LMV4G22", "servicos": [{"servico": "oleo", "km": 90000, "data": antes}]})
+    logado.post("/api/sair")
+    # Sem login e em texto puro, como manda a página do cliente (também a do GitHub Pages).
+    envio = lambda corpo: cliente.post("/api/leituras", content=corpo, headers={"content-type": "text/plain"})
+    assert envio('{"placa":"lmv-4g22","km":92000}').status_code == 200
+    assert envio('{"placa":"LMV4G22","km":92500}').status_code == 200  # mesmo dia: vale o último
+    assert envio('{"placa":"LMV4G22","km":80000}').status_code == 422  # menor que a visita
+    assert envio('{"placa":"XX","km":1}').status_code == 422
+    assert envio("lixo").status_code == 422
+    # Placa ainda sem visita fica guardada.
+    assert envio('{"placa":"QWE1R23","km":5000}').status_code == 200
+
+    logado.post("/api/entrar", json={"usuario": "marlon", "senha": "senha-boa-123"})
+    v = logado.get("/api/frota").json()["veiculos"]
+    assert [c["placa"] for c in v] == ["LMV4G22"]
+    assert v[0]["km_referencia"] == 92500 and v[0]["km_do_cliente"] and v[0]["km_por_dia"] == 50.0
+    det = logado.get("/api/veiculos/LMV4G22").json()
+    assert det["leituras"] == [{"placa": "LMV4G22", "km": 92500, "data": config.hoje().isoformat(), "usada": True}]
+
+
+def test_limite_de_envios(cliente):
+    for _ in range(30):
+        cliente.post("/api/leituras", content='{"placa":"QWE1R23","km":5000}')
+    assert cliente.post("/api/leituras", content='{"placa":"QWE1R23","km":5000}').status_code == 429

@@ -1,4 +1,4 @@
-"""Banco SQLite: usuários, sessões e registros de serviço por placa."""
+"""Banco SQLite: usuários, sessões, registros de serviço e km informados pelos clientes."""
 import sqlite3
 from contextlib import contextmanager
 
@@ -29,6 +29,15 @@ CREATE TABLE IF NOT EXISTS registros (
   UNIQUE (placa, servico, data)
 );
 CREATE INDEX IF NOT EXISTS registros_placa ON registros (placa, data);
+-- Km que o cliente digitou na página da etiqueta. Um por placa e dia; vale o último digitado.
+CREATE TABLE IF NOT EXISTS leituras_cliente (
+  id INTEGER PRIMARY KEY,
+  placa TEXT NOT NULL,
+  km INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (placa, data)
+);
 """
 
 

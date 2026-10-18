@@ -169,6 +169,7 @@ h1 { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.05; text-wra
 .tabela tbody tr.linha:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .tabela .placa-txt { font: 700 1.05rem var(--display); letter-spacing: .06em; }
 .tabela .est { color: var(--muted); font-size: .8em; }
+.tabela .est.cli { color: var(--accent); cursor: help; }
 .tabela tr.detalhe td { white-space: normal; background: var(--bg); padding: 12px 14px; }
 .tabela tr.detalhe table { font-size: .88rem; }
 .tabela tr.detalhe th { position: static; background: none; }

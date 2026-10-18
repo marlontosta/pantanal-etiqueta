@@ -3,7 +3,7 @@ import re
 from datetime import date
 
 from app import config
-from app.frota import km_por_dia, resumo_veiculo, somar_meses
+from app.frota import km_por_dia, leituras_validas, resumo_veiculo, somar_meses
 
 HOJE = date(2026, 10, 18)
 
@@ -56,3 +56,26 @@ def test_intervalos_iguais_ao_config_js():
         assert f'intervalo_meses: {s["intervalo_meses"]}' in linha
     assert re.search(r"margem: \{ fracao: ([\d.]+), km: (\d+), dias: (\d+) \}", js).groups() == \
         (str(config.MARGEM["fracao"]), str(config.MARGEM["km"]), str(config.MARGEM["dias"]))
+
+
+def test_km_do_cliente_entra_na_estimativa():
+    regs = [reg("oleo", 30000, "2026-05-31")]
+    # Sozinha, a visita não dá média; com o km do cliente 100 dias depois, dá 30 km/dia.
+    r = resumo_veiculo("ABC1D23", regs, HOJE, [{"km": 33000, "data": "2026-09-08"}])
+    assert r["ultimo_km"] == 30000
+    assert r["km_referencia"] == 33000 and r["km_do_cliente"] is True
+    assert r["km_por_dia"] == 30.0
+    assert r["km_atual"] == 33000 + 30 * 40
+    assert r["leituras_cliente"] == 1
+
+
+def test_km_do_cliente_absurdo_e_ignorado():
+    regs = [reg("oleo", 30000, "2026-05-31"), reg("geo", 36000, "2026-09-01")]
+    leituras = [{"km": 29000, "data": "2026-06-10"},   # menor que a visita anterior
+                {"km": 40000, "data": "2026-08-01"},   # maior que a visita seguinte
+                {"km": 900000, "data": "2026-10-01"},  # mais de 1.500 km por dia
+                {"km": 37000, "data": "2026-10-10"}]
+    v = leituras_validas(regs, leituras)
+    assert [x["usada"] for x in v] == [False, False, False, True]
+    r = resumo_veiculo("ABC1D23", regs, HOJE, leituras)
+    assert r["km_referencia"] == 37000 and r["leituras_cliente"] == 1

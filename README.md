@@ -108,6 +108,14 @@ ao backend todos os serviços que estão na tela (placa, serviço, km e data). L
 também salva o que ela tem, para carros que ainda não estão no sistema. O mesmo serviço na
 mesma placa e no mesmo dia não duplica.
 
+Na página do cliente, o km que ele digita em "Quilometragem atual" é enviado ao backend
+(`envioKm` no `config.js`) uns segundos depois que ele para de digitar, só se for maior que o
+km da etiqueta. Fica numa tabela separada (`leituras_cliente`), um valor por placa e dia, sem
+login. A página no GitHub Pages também envia, então etiquetas antigas contam. Para não poluir a
+estimativa, o km do cliente é ignorado se for menor que o de uma visita anterior, maior que o de
+uma visita posterior ou se exigir mais de 1.500 km por dia; e cada endereço IP pode enviar até
+30 vezes por hora. Km de placa que ainda não tem visita fica guardado e entra quando ela tiver.
+
 ### Tela de frota
 
 Uma linha por placa, com última visita, km na visita, km/dia, km atual, próxima manutenção,
@@ -115,9 +123,12 @@ previsão, dias e km que faltam e situação. Clique em qualquer coluna para ord
 inverte). Filtros: placa, situação, serviço, prazo da previsão e data da última visita. Clicar
 numa linha mostra todos os serviços do carro e o histórico de visitas.
 
-- **Km/dia**: (km da última visita − km da primeira) ÷ dias entre elas. Precisa de pelo menos
-  duas visitas com km e 7 dias entre elas; km que diminui não gera média.
-- **Km atual**: km da última visita + km/dia × dias desde então (marcado "est." quando estimado).
+- **Km/dia**: (último km conhecido − primeiro) ÷ dias entre eles, contando as visitas e o km
+  digitado pelo cliente. Precisa de pelo menos dois dias com km e 7 dias entre eles; km que
+  diminui não gera média.
+- **Km atual**: último km conhecido + km/dia × dias desde então (marcado "est." quando
+  estimado, e "cliente" quando o último km veio do cliente). "Km na visita" é sempre o da oficina.
+- O detalhe da placa lista os km informados pelo cliente, marcando os ignorados.
 - **Previsão** de cada serviço: a data mais próxima entre o prazo em meses e o dia em que o km
   estimado chega no km da próxima troca. A situação segue as mesmas regras da página do cliente.
 - Com "Serviço" escolhido, as colunas de previsão mostram aquele serviço em vez do mais urgente.
@@ -130,6 +141,7 @@ numa linha mostra todos os serviços do carro e o histórico de visitas.
 | `POST /api/sair`           | encerra a sessão                           |
 | `GET /api/eu`              | usuário logado                             |
 | `POST /api/registros`      | `{placa, servicos: [{servico, km, data}]}` |
+| `POST /api/leituras`       | `{placa, km}` do cliente, sem login         |
 | `GET /api/frota`           | resumo de todas as placas                  |
 | `GET /api/veiculos/{placa}`| resumo e histórico de uma placa            |
 

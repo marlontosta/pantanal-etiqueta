@@ -11,6 +11,9 @@ window.ETIQUETA = {
   paginaCliente: "https://marlao.pythonanywhere.com/",
   // Endereço da área da oficina (backend). Vazio esconde o link no rodapé da página do cliente.
   areaOficina: "https://marlao.pythonanywhere.com/oficina/",
+  // Para onde vai o km que o cliente digita (estimativa de km/dia na frota). Vazio não envia.
+  // Endereço completo, porque a página também é publicada no GitHub Pages (etiquetas antigas).
+  envioKm: "https://marlao.pythonanywhere.com/api/leituras",
   // Plataforma com o histórico detalhado: link direto para o login/cadastro do cliente.
   sobreRodas: { nome: "Sobre Rodas", url: "https://sobrerodas.club/client/login" },
   // "c": letra do serviço no link da etiqueta.

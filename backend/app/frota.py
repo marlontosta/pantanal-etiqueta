@@ -7,6 +7,8 @@ from . import config
 RANK = {"bad": 0, "warn": 1, "ok": 2}
 # Visitas muito próximas dão médias absurdas com qualquer erro de digitação no km.
 DIAS_MINIMOS_MEDIA = 7
+# Km do cliente que exige rodar mais que isso por dia desde o km anterior é erro de digitação.
+KM_DIA_MAXIMO = 1500
 
 
 def somar_meses(d: date, meses: int) -> date:
@@ -16,7 +18,7 @@ def somar_meses(d: date, meses: int) -> date:
 
 
 def km_por_dia(registros: list[dict]) -> float | None:
-    """Média entre a visita mais antiga e a mais recente com km. None se não dá para calcular."""
+    """Média entre o km mais antigo e o mais recente (visitas e km do cliente). None se não dá para calcular."""
     por_dia: dict[date, int] = {}
     for r in registros:
         if r["km"] is not None:
@@ -32,18 +34,43 @@ def km_por_dia(registros: list[dict]) -> float | None:
     return media if media >= 0 else None
 
 
-def resumo_veiculo(placa: str, registros: list[dict], hoje: date) -> dict:
-    """registros: [{servico, km, data}] de uma placa, em qualquer ordem."""
+def leituras_validas(registros: list[dict], leituras: list[dict]) -> list[dict]:
+    """Km do cliente que fazem sentido com as visitas da oficina: nem menor que o km de uma
+    visita anterior, nem maior que o de uma posterior, nem com mais de KM_DIA_MAXIMO por dia.
+    Cada leitura é conferida só com as visitas, para um erro de digitação não derrubar as seguintes.
+    Cada leitura volta com "usada"."""
+    pontos = [(date.fromisoformat(r["data"]), r["km"]) for r in registros if r["km"] is not None]
+    saida = []
+    for lt in sorted(leituras, key=lambda x: x["data"]):
+        d = date.fromisoformat(lt["data"])
+        antes = [p for p in pontos if p[0] <= d]
+        ok = True
+        if antes:
+            d0, k0 = max(antes, key=lambda p: (p[0], p[1]))
+            ok = lt["km"] >= max(k for _, k in antes) and lt["km"] - k0 <= KM_DIA_MAXIMO * max(1, (d - d0).days)
+        # Uma visita depois com km menor também desmente a leitura.
+        ok = ok and all(k >= lt["km"] for dd, k in pontos if dd > d)
+        saida.append({**lt, "usada": ok})
+    return saida
+
+
+def resumo_veiculo(placa: str, registros: list[dict], hoje: date, leituras: list[dict] = ()) -> dict:
+    """registros: [{servico, km, data}] de uma placa, em qualquer ordem.
+    leituras: [{km, data}] que o cliente digitou na página da etiqueta."""
     m = config.MARGEM
     datas = [date.fromisoformat(r["data"]) for r in registros]
     ult_visita = max(datas)
     com_km = [r for r in registros if r["km"] is not None]
-    # Último km conhecido: o maior km da visita mais recente que tem km.
-    ref = max(com_km, key=lambda r: (r["data"], r["km"])) if com_km else None
+    # O km da visita fica separado; o do cliente só entra na estimativa.
+    ref_visita = max(com_km, key=lambda r: (r["data"], r["km"])) if com_km else None
+    do_cliente = [{**lt, "cliente": True} for lt in leituras_validas(registros, list(leituras)) if lt["usada"]]
+    pontos = com_km + do_cliente
+    # Último km conhecido: o maior km do dia mais recente que tem km (visita ou cliente).
+    ref = max(pontos, key=lambda r: (r["data"], r["km"])) if pontos else None
     km_ult = ref["km"] if ref else None
     data_km = date.fromisoformat(ref["data"]) if ref else None
 
-    media = km_por_dia(registros)
+    media = km_por_dia(pontos)
     km_atual = None
     if km_ult is not None:
         km_atual = round(km_ult + (media or 0) * max(0, (hoje - data_km).days))
@@ -79,7 +106,11 @@ def resumo_veiculo(placa: str, registros: list[dict], hoje: date) -> dict:
     return {
         "placa": placa,
         "ultima_visita": ult_visita.isoformat(),
-        "ultimo_km": km_ult,
+        "ultimo_km": ref_visita["km"] if ref_visita else None,
+        "km_referencia": km_ult,
+        "km_referencia_data": ref["data"] if ref else None,
+        "km_do_cliente": bool(ref and ref.get("cliente")),
+        "leituras_cliente": len(do_cliente),
         "km_por_dia": round(media, 1) if media is not None else None,
         "km_atual": km_atual,
         "km_estimado": bool(media) and km_ult is not None and data_km < hoje,
@@ -90,8 +121,12 @@ def resumo_veiculo(placa: str, registros: list[dict], hoje: date) -> dict:
     }
 
 
-def resumo_frota(registros: list[dict], hoje: date) -> list[dict]:
+def resumo_frota(registros: list[dict], hoje: date, leituras: list[dict] = ()) -> list[dict]:
+    """Só aparecem placas com visita; km do cliente sem visita fica guardado para depois."""
     por_placa: dict[str, list[dict]] = {}
     for r in registros:
         por_placa.setdefault(r["placa"], []).append(r)
-    return [resumo_veiculo(p, rs, hoje) for p, rs in sorted(por_placa.items())]
+    lt_placa: dict[str, list[dict]] = {}
+    for lt in leituras:
+        lt_placa.setdefault(lt["placa"], []).append(lt)
+    return [resumo_veiculo(p, rs, hoje, lt_placa.get(p, [])) for p, rs in sorted(por_placa.items())]

@@ -181,7 +181,7 @@ function render() {
 
   $("kmhint").textContent = kmAtual < kmUltimo
     ? "Atenção: valor menor que o da última visita (" + fmtKm(kmUltimo) + " km)."
-    : "Digite o valor do painel para recalcular.";
+    : "Digite o valor do painel para recalcular." + (podeEnviar ? " A oficina recebe esse km para prever suas próximas manutenções." : "");
 
   const pend = itens.filter(i => i.status === "bad" || i.status === "warn").map(i => i.nome);
   const msg = "Olá! Quero agendar manutenção do veículo " + placa + " (" + fmtKm(kmAtual) + " km)." +
@@ -216,11 +216,29 @@ let salvo = null;
 try { salvo = localStorage.getItem("km:" + placa); } catch (e) {}
 $("km").value = fmtKm(Math.max(Number(salvo) || 0, kmUltimo));
 
+// Km digitado pelo cliente vai para a oficina, alguns segundos depois de parar de digitar.
+// Texto puro e sem ler a resposta: funciona também da página antiga no GitHub Pages, sem CORS.
+const podeEnviar = Boolean(CFG.envioKm && temDados && /^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(placa));
+let espera = null;
+function enviarKm() {
+  clearTimeout(espera); espera = null;
+  const km = U.km($("km").value);
+  if (!podeEnviar || !km || km <= kmUltimo) return;
+  const chave = "enviado:" + placa, hojeTxt = U.iso(hoje());
+  try { if (localStorage.getItem(chave) === hojeTxt + ":" + km) return; } catch (e) {}
+  fetch(CFG.envioKm, { method: "POST", mode: "no-cors", keepalive: true, body: JSON.stringify({ placa, km }) })
+    .then(() => { try { localStorage.setItem(chave, hojeTxt + ":" + km); } catch (e) {} }, () => {});
+}
+
 $("km").addEventListener("input", e => {
   const n = e.target.value.replace(/\D/g, "").slice(0, 7);
   e.target.value = n ? fmtKm(Number(n)) : "";
   render();
+  clearTimeout(espera);
+  espera = setTimeout(enviarKm, 4000);
 });
+$("km").addEventListener("change", enviarKm);
+document.addEventListener("visibilitychange", () => { if (document.hidden && espera) enviarKm(); });
 
 render();
 </script>
