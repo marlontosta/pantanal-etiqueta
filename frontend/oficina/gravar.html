@@ -176,7 +176,6 @@ function atualizar() {
   const q = $("qr"); q.replaceChildren();
   if (window.QRCode) new QRCode(q, { text: url, width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
   else q.textContent = "O QR code precisa de internet para aparecer.";
-  try { localStorage.setItem("etq:base", $("base").value.trim()); } catch (e) {}
 }
 
 function carregar(url) {
@@ -277,9 +276,8 @@ $("base").addEventListener("input", atualizar);
 
 // Estado inicial
 $("visitaDt").value = U.iso(new Date());
-let base = "";
-try { base = localStorage.getItem("etq:base") || ""; } catch (e) {}
-$("base").value = base || CFG.paginaCliente;
+// Sempre começa pelo endereço do config.js, para trocar de hospedagem num lugar só.
+$("base").value = CFG.paginaCliente;
 $("linkCliente").href = CFG.paginaCliente;
 OFICINA.menu();
 if (!nfc) $("btnGravar").textContent = "Gravar na etiqueta NFC (só Chrome Android)";
