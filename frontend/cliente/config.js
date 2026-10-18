@@ -8,9 +8,9 @@ window.ETIQUETA = {
     instagram: "pantanalpneus.ms"
   },
   // Endereço publicado da página do cliente: é o começo do link gravado na etiqueta.
-  paginaCliente: "https://marlontosta.github.io/pantanal-etiqueta/",
+  paginaCliente: "https://marlao.pythonanywhere.com/",
   // Endereço da área da oficina (backend). Vazio esconde o link no rodapé da página do cliente.
-  areaOficina: "",
+  areaOficina: "https://marlao.pythonanywhere.com/oficina/",
   // Plataforma com o histórico detalhado: link direto para o login/cadastro do cliente.
   sobreRodas: { nome: "Sobre Rodas", url: "https://sobrerodas.club/client/login" },
   // "c": letra do serviço no link da etiqueta.
