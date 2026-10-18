@@ -1,4 +1,4 @@
-# Publica a pasta public/ no GitHub Pages a cada push na main.
+# Publica a pasta frontend/cliente/ no GitHub Pages a cada push na main.
 name: Publicar no GitHub Pages
 on:
   push:
@@ -22,6 +22,6 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: public
+          path: frontend/cliente
       - id: deploy
         uses: actions/deploy-pages@v4

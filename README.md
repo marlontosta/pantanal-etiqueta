@@ -2,19 +2,36 @@
 
 Página estática que o cliente abre ao encostar o celular na etiqueta NFC do veículo
 (ou ler o QR code). Os dados da última visita ficam no próprio link gravado na etiqueta,
-então não há servidor nem banco de dados.
+então a página do cliente não depende de servidor.
+
+A área da oficina (gravar etiqueta e tela de frota) fica atrás de login e roda num backend
+em Python, que guarda cada visita num banco SQLite.
 
 ## Estrutura
 
 ```
 etiqueta/
-├── README.md
-└── public/            ← tudo que vai para a hospedagem
-    ├── index.html     página do cliente (lê os parâmetros do link)
-    ├── gravar.html    área da oficina (lê, monta e grava o link na etiqueta)
-    ├── config.js      oficina, serviços, intervalos e margens (edite só aqui)
-    ├── estilo.css     visual das duas páginas
-    └── logo.png
+├── frontend/
+│   ├── cliente/         ← página do cliente, publicada no GitHub Pages
+│   │   ├── index.html   lê os parâmetros do link da etiqueta
+│   │   ├── config.js    oficina, serviços, intervalos e margens (edite só aqui)
+│   │   ├── estilo.css   visual de todas as páginas
+│   │   └── logo.png
+│   └── oficina/         ← área da oficina, servida pelo backend, exige login
+│       ├── entrar.html  login
+│       ├── frota.html   veículos por placa: km atual, km/dia, próxima manutenção
+│       ├── gravar.html  lê, monta e grava o link na etiqueta; salva a visita
+│       └── oficina.js   chamadas à API e menu
+├── backend/             ← API em Python (FastAPI + SQLite)
+│   ├── app/
+│   │   ├── main.py      rotas da API e páginas da oficina
+│   │   ├── frota.py     cálculos de km/dia, km atual e previsões
+│   │   ├── seguranca.py senhas e sessões
+│   │   ├── db.py        banco SQLite
+│   │   ├── config.py    intervalos (iguais ao config.js; um teste confere)
+│   │   └── usuarios.py  criar, listar e remover usuários
+│   └── tests/
+└── servidor.py          serve só a página do cliente, sem backend
 ```
 
 ## Parâmetros do link
@@ -42,12 +59,83 @@ que é o caso comum de vários serviços feitos na mesma visita.
 - Qualquer serviço pode faltar; ele aparece como "Sem registro".
 - Sem nenhum parâmetro, `index.html` mostra um exemplo de demonstração.
 
-As letras, intervalos (km e meses) e margens de aviso ficam em `public/config.js`.
+As letras, intervalos (km e meses) e margens de aviso ficam em `frontend/cliente/config.js`.
+Se mudar um intervalo, mude também em `backend/app/config.py` (um teste avisa se ficarem diferentes).
 Mudar a letra de um serviço invalida as etiquetas já gravadas com a letra antiga.
+
+## Área da oficina (backend)
+
+### Rodar
+
+```bash
+cd backend
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+python -m app.usuarios criar marlon "Marlon"     # pede a senha
+PANTANAL_COOKIE_SEGURO=0 uvicorn app.main:app --port 8000
+```
+
+Abra `http://localhost:8000/oficina/`. Sem login, qualquer página da oficina volta para a tela
+de entrar. `PANTANAL_COOKIE_SEGURO=0` só vale para testar em http; publicado em https, deixe sem.
+
+Testes: `pip install -r requirements-dev.txt && python -m pytest`.
+
+### Configuração (variáveis de ambiente)
+
+| Variável                  | Padrão                       | Para que serve                                    |
+|---------------------------|------------------------------|---------------------------------------------------|
+| `PANTANAL_BANCO`          | `backend/dados/pantanal.db`  | arquivo do banco; precisa ficar num disco que não se apaga |
+| `PANTANAL_COOKIE_SEGURO`  | `1`                          | cookie só por https                               |
+| `PANTANAL_SESSAO_DIAS`    | `30`                         | quantos dias o login dura                         |
+| `PANTANAL_USUARIO` / `PANTANAL_SENHA` | –                | cria esse usuário na primeira vez, se o banco não tiver nenhum (para hospedagens sem terminal) |
+
+### Usuários
+
+```bash
+python -m app.usuarios listar
+python -m app.usuarios criar joao "João da Silva"
+python -m app.usuarios senha joao      # troca a senha e derruba os logins dele
+python -m app.usuarios remover joao
+```
+
+As senhas ficam guardadas com hash (scrypt). Cinco senhas erradas em 15 minutos bloqueiam o
+usuário até a janela passar.
+
+### O que é salvo
+
+Ao gravar a etiqueta, copiar o link ou clicar em "Só salvar no sistema", a tela de gravar envia
+ao backend todos os serviços que estão na tela (placa, serviço, km e data). Ler uma etiqueta
+também salva o que ela tem, para carros que ainda não estão no sistema. O mesmo serviço na
+mesma placa e no mesmo dia não duplica.
+
+### Tela de frota
+
+Uma linha por placa, com última visita, km na visita, km/dia, km atual, próxima manutenção,
+previsão, dias e km que faltam e situação. Clique em qualquer coluna para ordenar (de novo
+inverte). Filtros: placa, situação, serviço, prazo da previsão e data da última visita. Clicar
+numa linha mostra todos os serviços do carro e o histórico de visitas.
+
+- **Km/dia**: (km da última visita − km da primeira) ÷ dias entre elas. Precisa de pelo menos
+  duas visitas com km e 7 dias entre elas; km que diminui não gera média.
+- **Km atual**: km da última visita + km/dia × dias desde então (marcado "est." quando estimado).
+- **Previsão** de cada serviço: a data mais próxima entre o prazo em meses e o dia em que o km
+  estimado chega no km da próxima troca. A situação segue as mesmas regras da página do cliente.
+- Com "Serviço" escolhido, as colunas de previsão mostram aquele serviço em vez do mais urgente.
+
+### API
+
+| Rota                       | O que faz                                  |
+|----------------------------|--------------------------------------------|
+| `POST /api/entrar`         | `{usuario, senha}` → cookie de sessão      |
+| `POST /api/sair`           | encerra a sessão                           |
+| `GET /api/eu`              | usuário logado                             |
+| `POST /api/registros`      | `{placa, servicos: [{servico, km, data}]}` |
+| `GET /api/frota`           | resumo de todas as placas                  |
+| `GET /api/veiculos/{placa}`| resumo e histórico de uma placa            |
 
 ## Montar o link a partir da OS
 
-Em `gravar.html`, cole no campo "Colar itens da OS" a placa, o km e os itens da ordem de serviço.
+Em `frontend/oficina/gravar.html`, cole no campo "Colar itens da OS" a placa, o km e os itens da ordem de serviço.
 A página reconhece `Placa: LMV4G22`, `KM do serviço: 95178` e marca como feitos hoje os
 serviços cujas descrições contêm os trechos do campo `os` de cada serviço no `config.js`
 (`TROCA DE OLEO`; `REVISAO`, `SUSPENS`, `FREIO`, `AMORTECEDOR`, `BIELETA`, `TERMINAL`, `BANDEJA`, `PASTILHA` ou `AXIAL`; `ALINHAMENTO`, `BALANCEAMENTO` ou `GEOMETRIA`; `HIGIENIZ`). Os demais itens da OS são ignorados.
@@ -62,25 +150,27 @@ Exemplo: uma OS com troca de óleo, peças de suspensão (revisão mecânica) e 
 
 No fim da página do cliente, o botão "Ver detalhes no Sobre Rodas" abre em nova aba a tela de
 login/cadastro do cliente: `https://sobrerodas.club/client/login`. Nenhum dado da etiqueta é
-enviado. O endereço fica em `sobreRodas.url` no `config.js`.
+enviado. O endereço fica em `sobreRodas.url` no `config.js`. O link "Área da oficina" no rodapé só aparece
+quando `areaOficina` estiver preenchido com o endereço do backend.
 
 ## Tamanho da etiqueta
 
 O link do exemplo acima tem 77 bytes na etiqueta; com os quatro serviços em datas diferentes,
 cerca de 100. Os dois cabem na **NTAG213** (137 bytes), a etiqueta mais barata. A maior parte
 é o endereço `marlontosta.github.io/pantanal-etiqueta/` (40 caracteres); um domínio próprio
-curto encurtaria ainda mais. A página `gravar.html` mostra o tamanho e em quais chips cabe.
+curto encurtaria ainda mais. A tela de gravar mostra o tamanho e em quais chips cabe.
 
 ## Hospedagem (precisa ser https)
 
 A gravação NFC pelo navegador (Web NFC) só funciona no **Chrome para Android** e só em páginas
-servidas por **https**. Qualquer hospedagem estática serve; publique o conteúdo de `public/`:
+servidas por **https**.
 
-- **GitHub Pages**: crie um repositório, envie o conteúdo de `public/` e ative Pages.
-- **Netlify** ou **Cloudflare Pages**: arraste a pasta `public/` no painel.
-
-Depois de publicado, abra `https://<seu-endereço>/gravar.html` no Chrome Android. O campo
-"Endereço da página do cliente" é preenchido sozinho com o endereço publicado.
+- **Página do cliente**: o GitHub Pages publica `frontend/cliente/` a cada push na main
+  (`.github/workflows/pages.yml`). As etiquetas apontam para esse endereço (`paginaCliente`
+  no `config.js`), que não muda.
+- **Backend e área da oficina**: o GitHub Pages não roda Python. É preciso uma hospedagem com
+  Python e um disco que guarde o arquivo do banco entre reinícios (`PANTANAL_BANCO`). Depois de
+  publicado, abra `https://<endereço-do-backend>/oficina/gravar.html` no Chrome Android.
 
 Sem Chrome Android, copie o link gerado e grave com um app como NFC Tools, ou imprima o QR code.
 
@@ -90,7 +180,7 @@ Sem Chrome Android, copie o link gerado e grave com um app como NFC Tools, ou im
 cd etiqueta && python3 servidor.py
 ```
 
-O script serve a pasta `public/` na porta 8080 (outra porta: `python3 servidor.py 9000`) e mostra
-os endereços: `http://localhost:8080/` (página do cliente), `http://localhost:8080/gravar.html`
-e o endereço pelo IP da máquina, para abrir no celular conectado à mesma rede Wi-Fi.
+O script serve só a página do cliente (`frontend/cliente/`) na porta 8080 (outra porta:
+`python3 servidor.py 9000`) e mostra o endereço local e o endereço pelo IP da máquina, para abrir
+no celular conectado à mesma rede Wi-Fi. Para a área da oficina, rode o backend (acima).
 NFC não funciona em http local; para testar a gravação, use a versão publicada em https.

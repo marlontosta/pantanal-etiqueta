@@ -66,7 +66,7 @@
     <div><b style="color:var(--warn)">●</b> Próxima: faltam até 10% do intervalo ou 3.000 km (o que for menor), ou até 30 dias.</div>
     <div><b style="color:var(--bad)">●</b> Vencida: passou da quilometragem ou da data.</div>
     <div>A previsão de mês é estimada pela média de km rodados por dia desde a última visita.</div>
-    <div class="foot-links"><span>Dados lidos da etiqueta NFC do veículo.</span><a href="gravar.html">Área da oficina</a></div>
+    <div class="foot-links"><span>Dados lidos da etiqueta NFC do veículo.</span><a id="linkOficina" href="#" hidden>Área da oficina</a></div>
   </footer>
 </main>
 
@@ -204,6 +204,7 @@ $("foneTopo").textContent = U.fone(of.whatsapp);
 $("placa").textContent = placa;
 $("detalhes").href = CFG.sobreRodas.url;
 $("detalhes").textContent = "Ver detalhes no " + CFG.sobreRodas.nome;
+if (CFG.areaOficina) { $("linkOficina").href = CFG.areaOficina; $("linkOficina").hidden = false; }
 $("ultData").textContent = dataUltima ? fmtData(dataUltima) : "–";
 $("ultKm").textContent = kms.length ? fmtKm(kmUltimo) + " km" : "–";
 if (!temDados) {

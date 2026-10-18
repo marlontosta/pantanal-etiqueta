@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frota · Área da oficina</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../estilo.css">
+</head>
+<body>
+<main class="wrap largo">
+  <header class="brandbar oficina">
+    <img src="../logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
+    <nav class="menu" aria-label="Área da oficina">
+      <a href="frota.html">Frota</a>
+      <a href="gravar.html">Gravar etiqueta</a>
+      <span class="quem"></span>
+      <button type="button" data-sair>Sair</button>
+    </nav>
+  </header>
+
+  <section class="summary" aria-label="Resumo por situação">
+    <button type="button" class="chip bad" data-st="bad" aria-pressed="false"><span class="num tab" id="nBad">0</span> vencidas</button>
+    <button type="button" class="chip warn" data-st="warn" aria-pressed="false"><span class="num tab" id="nWarn">0</span> próximas</button>
+    <button type="button" class="chip ok" data-st="ok" aria-pressed="false"><span class="num tab" id="nOk">0</span> em dia</button>
+  </section>
+
+  <section class="card" aria-label="Filtros">
+    <div class="filtros">
+      <div class="field"><label for="fPlaca">Placa</label><input id="fPlaca" type="search" autocomplete="off" placeholder="ABC1D23" style="text-transform:uppercase"></div>
+      <div class="field"><label for="fStatus">Situação</label>
+        <select id="fStatus"><option value="">Todas</option><option value="bad">Vencida</option><option value="warn">Próxima</option><option value="ok">Em dia</option></select></div>
+      <div class="field"><label for="fServico">Serviço</label><select id="fServico"><option value="">Mais urgente</option></select></div>
+      <div class="field"><label for="fPrazo">Previsão</label>
+        <select id="fPrazo"><option value="">Qualquer data</option><option value="0">Já vencida</option><option value="7">Nos próximos 7 dias</option><option value="15">Nos próximos 15 dias</option><option value="30">Nos próximos 30 dias</option><option value="60">Nos próximos 60 dias</option><option value="90">Nos próximos 90 dias</option></select></div>
+      <div class="field"><label for="fVisita">Última visita</label>
+        <select id="fVisita"><option value="">Qualquer data</option><option value="-90">Nos últimos 3 meses</option><option value="180">Há mais de 6 meses</option><option value="365">Há mais de 1 ano</option></select></div>
+    </div>
+    <div class="actions" style="justify-content:space-between;align-items:center">
+      <span class="small" id="contagem" aria-live="polite"></span>
+      <button class="b" type="button" id="limpar">Limpar filtros</button>
+    </div>
+  </section>
+
+  <div class="tabela">
+    <table>
+      <thead><tr id="cabecalho"></tr></thead>
+      <tbody id="corpo"><tr><td class="vazio" colspan="10">Carregando…</td></tr></tbody>
+    </table>
+  </div>
+
+  <footer class="small legend">
+    <div>Km/dia é a média entre a primeira e a última visita com km (com pelo menos 7 dias entre elas). Km atual é o último km mais essa média vezes os dias desde a visita (marcado "est.").</div>
+    <div>Previsão é a data mais próxima entre o prazo em meses e o dia estimado em que o carro chega no km da próxima troca. Clique numa linha para ver todos os serviços e o histórico.</div>
+  </footer>
+</main>
+<script src="../config.js"></script>
+<script src="oficina.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const RANK = { bad: 0, warn: 1, ok: 2 };
+const TEXTO = { bad: "Vencida", warn: "Próxima", ok: "Em dia" };
+const fmtKm = n => n == null ? "–" : n.toLocaleString("pt-BR");
+const fmtData = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4) : "–";
+const DIA = 864e5;
+let veiculos = [], hoje = "", ordem = { col: "previsao", asc: true };
+const abertos = new Set();
+
+// Linha da tabela: o carro e o serviço mostrado (o mais urgente, ou o filtrado).
+const COLS = [
+  { k: "placa", t: "Placa", v: x => x.v.placa, f: x => el("span", "placa-txt", x.v.placa) },
+  { k: "visita", t: "Última visita", v: x => x.v.ultima_visita, f: x => fmtData(x.v.ultima_visita) },
+  { k: "kmvisita", t: "Km na visita", n: 1, v: x => x.v.ultimo_km, f: x => fmtKm(x.v.ultimo_km) },
+  { k: "kmdia", t: "Km/dia", n: 1, v: x => x.v.km_por_dia, f: x => x.v.km_por_dia == null ? "–" : x.v.km_por_dia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) },
+  { k: "kmatual", t: "Km atual", n: 1, v: x => x.v.km_atual, f: x => {
+      const s = el("span", null, fmtKm(x.v.km_atual));
+      if (x.v.km_estimado) s.append(" ", el("span", "est", "est."));
+      return s;
+    } },
+  { k: "servico", t: "Próxima manutenção", w: 1, v: x => x.s?.nome, f: x => x.s?.nome || "–" },
+  { k: "previsao", t: "Previsão", v: x => x.s?.proxima_data, f: x => fmtData(x.s?.proxima_data) },
+  { k: "dias", t: "Faltam dias", n: 1, v: x => x.s?.falta_dias, f: x => x.s ? fmtKm(x.s.falta_dias) : "–" },
+  { k: "km", t: "Faltam km", n: 1, v: x => x.s?.falta_km, f: x => x.s ? fmtKm(x.s.falta_km) : "–" },
+  { k: "status", t: "Situação", v: x => x.s ? RANK[x.s.status] : null, f: x => x.s ? el("span", "st " + x.s.status, TEXTO[x.s.status]) : "–" }
+];
+
+function el(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+function montarCabecalho() {
+  const tr = $("cabecalho");
+  for (const c of COLS) {
+    const th = el("th", c.n ? "n" : null);
+    th.scope = "col";
+    th.dataset.k = c.k;
+    const b = el("button", null, c.t);
+    b.type = "button";
+    b.addEventListener("click", () => {
+      ordem = { col: c.k, asc: ordem.col === c.k ? !ordem.asc : true };
+      render();
+    });
+    th.append(b);
+    tr.append(th);
+  }
+}
+
+function linhasFiltradas() {
+  const placa = $("fPlaca").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const servico = $("fServico").value, prazo = $("fPrazo").value, visita = $("fVisita").value;
+  const hj = Date.parse(hoje);
+  const linhas = [];
+  for (const v of veiculos) {
+    const s = servico ? v.servicos.find(i => i.servico === servico) : v.proxima;
+    if (servico && !s) continue;
+    if (placa && !v.placa.includes(placa)) continue;
+    if (prazo !== "") {
+      // "Já vencida": dias negativos. "Nos próximos N dias": de hoje até N, sem as vencidas.
+      if (!s || (+prazo === 0 ? s.falta_dias >= 0 : s.falta_dias < 0 || s.falta_dias > +prazo)) continue;
+    }
+    if (visita) {
+      const dias = (hj - Date.parse(v.ultima_visita)) / DIA;
+      if (+visita < 0 ? dias > -visita : dias <= +visita) continue;
+    }
+    linhas.push({ v, s });
+  }
+  return linhas;
+}
+
+function render() {
+  const todas = linhasFiltradas();
+  // Os contadores respeitam os outros filtros, mas não o de situação.
+  const cont = { bad: 0, warn: 0, ok: 0 };
+  for (const x of todas) if (x.s) cont[x.s.status]++;
+  $("nBad").textContent = cont.bad; $("nWarn").textContent = cont.warn; $("nOk").textContent = cont.ok;
+  const st = $("fStatus").value;
+  for (const b of document.querySelectorAll(".summary .chip")) b.setAttribute("aria-pressed", b.dataset.st === st);
+  const linhas = st ? todas.filter(x => x.s && x.s.status === st) : todas;
+
+  const col = COLS.find(c => c.k === ordem.col);
+  linhas.sort((a, b) => {
+    const va = col.v(a), vb = col.v(b);
+    // Vazios sempre no fim, nos dois sentidos.
+    if (va == null || vb == null) return (va == null) - (vb == null);
+    const r = typeof va === "number" ? va - vb : String(va).localeCompare(String(vb), "pt-BR");
+    return (ordem.asc ? r : -r) || a.v.placa.localeCompare(b.v.placa);
+  });
+  for (const th of $("cabecalho").children) {
+    if (th.dataset.k === ordem.col) th.setAttribute("aria-sort", ordem.asc ? "ascending" : "descending");
+    else th.removeAttribute("aria-sort");
+  }
+
+  const corpo = $("corpo");
+  corpo.replaceChildren();
+  for (const x of linhas) {
+    const tr = el("tr", "linha");
+    tr.tabIndex = 0;
+    tr.setAttribute("aria-expanded", abertos.has(x.v.placa));
+    for (const c of COLS) {
+      const td = el("td", c.n ? "n" : c.w ? "w" : null);
+      const f = c.f(x);
+      td.append(f instanceof Node ? f : document.createTextNode(f));
+      tr.append(td);
+    }
+    const alternar = () => { abertos.has(x.v.placa) ? abertos.delete(x.v.placa) : abertos.add(x.v.placa); render(); };
+    tr.addEventListener("click", alternar);
+    tr.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); alternar(); } });
+    corpo.append(tr);
+    if (abertos.has(x.v.placa)) corpo.append(detalhe(x.v));
+  }
+  if (!linhas.length) {
+    const td = el("td", "vazio", veiculos.length ? "Nenhum veículo com esses filtros." : "Nenhum veículo registrado ainda. Os carros aparecem aqui quando a etiqueta é gravada ou lida na tela Gravar etiqueta.");
+    td.colSpan = COLS.length;
+    corpo.append(el("tr"));
+    corpo.lastChild.append(td);
+  }
+  $("contagem").textContent = linhas.length + (linhas.length === 1 ? " veículo" : " veículos") +
+    (linhas.length !== veiculos.length ? " de " + veiculos.length : "");
+}
+
+// Linha aberta: todos os serviços do carro e o histórico de visitas.
+function detalhe(v) {
+  const tr = el("tr", "detalhe"), td = el("td");
+  td.colSpan = COLS.length;
+  const t = el("table");
+  t.innerHTML = "<thead><tr><th>Serviço</th><th>Último</th><th class='n'>Km</th><th class='n'>Próximo km</th><th class='n'>Faltam km</th><th>Previsão</th><th class='n'>Faltam dias</th><th>Situação</th></tr></thead>";
+  const tb = el("tbody");
+  for (const s of v.servicos) {
+    const r = el("tr");
+    r.append(el("td", null, s.nome), el("td", null, fmtData(s.ultima_data)), el("td", "n", fmtKm(s.ultimo_km)),
+      el("td", "n", fmtKm(s.proximo_km)), el("td", "n", fmtKm(s.falta_km)), el("td", null, fmtData(s.proxima_data)),
+      el("td", "n", fmtKm(s.falta_dias)));
+    const st = el("td"); st.append(el("span", "st " + s.status, TEXTO[s.status])); r.append(st);
+    tb.append(r);
+  }
+  t.append(tb);
+  const hist = el("p", "small", "Carregando histórico…");
+  td.append(t, hist);
+  tr.append(td);
+  OFICINA.api("/api/veiculos/" + v.placa).then(d => {
+    const nomes = Object.fromEntries(CFG.servicos.map(s => [s.id, s.nome]));
+    const porData = {};
+    for (const r of d.historico) (porData[r.data] ||= { km: r.km, itens: [] }).itens.push(nomes[r.servico] || r.servico);
+    hist.textContent = "Histórico: " + Object.entries(porData).map(([dt, x]) =>
+      fmtData(dt) + (x.km != null ? " (" + fmtKm(x.km) + " km)" : "") + ": " + x.itens.join(", ")).join(" · ");
+  }).catch(e => { hist.textContent = "Não carregou o histórico: " + e.message; });
+  return tr;
+}
+
+const CFG = window.ETIQUETA;
+for (const s of CFG.servicos) { const o = el("option", null, s.nome); o.value = s.id; $("fServico").append(o); }
+for (const id of ["fPlaca", "fStatus", "fServico", "fPrazo", "fVisita"]) $(id).addEventListener("input", render);
+for (const b of document.querySelectorAll(".summary .chip"))
+  b.addEventListener("click", () => { $("fStatus").value = $("fStatus").value === b.dataset.st ? "" : b.dataset.st; render(); });
+$("limpar").addEventListener("click", () => { for (const id of ["fPlaca", "fStatus", "fServico", "fPrazo", "fVisita"]) $(id).value = ""; render(); });
+
+montarCabecalho();
+OFICINA.menu();
+OFICINA.api("/api/frota").then(d => { veiculos = d.veiculos; hoje = d.hoje; render(); })
+  .catch(e => { $("corpo").innerHTML = ""; const td = el("td", "vazio", "Não consegui carregar a frota: " + e.message); td.colSpan = COLS.length; $("corpo").append(el("tr")); $("corpo").lastChild.append(td); });
+</script>
+</body>
+</html>

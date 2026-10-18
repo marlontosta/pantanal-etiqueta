@@ -7,6 +7,10 @@ window.ETIQUETA = {
     whatsapp: "5567999367507",
     instagram: "pantanalpneus.ms"
   },
+  // Endereço publicado da página do cliente: é o começo do link gravado na etiqueta.
+  paginaCliente: "https://marlontosta.github.io/pantanal-etiqueta/",
+  // Endereço da área da oficina (backend). Vazio esconde o link no rodapé da página do cliente.
+  areaOficina: "",
   // Plataforma com o histórico detalhado: link direto para o login/cadastro do cliente.
   sobreRodas: { nome: "Sobre Rodas", url: "https://sobrerodas.club/client/login" },
   // "c": letra do serviço no link da etiqueta.

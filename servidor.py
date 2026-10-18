@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Servidor local para testar a etiqueta. Uso: python3 servidor.py [porta]"""
+"""Servidor local só da página do cliente (sem backend). Uso: python3 servidor.py [porta]"""
 import functools
 import http.server
 import pathlib
@@ -7,7 +7,7 @@ import socket
 import sys
 
 PORTA = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-PASTA = pathlib.Path(__file__).resolve().parent / "public"
+PASTA = pathlib.Path(__file__).resolve().parent / "frontend" / "cliente"
 EXEMPLO = "?p=LMV4G22&o=21fu.1wv&r=o&g=o"
 
 
@@ -27,7 +27,6 @@ handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(
 with http.server.ThreadingHTTPServer(("0.0.0.0", PORTA), handler) as srv:
     ip = ip_da_rede()
     print(f"Página do cliente:  http://localhost:{PORTA}/{EXEMPLO}")
-    print(f"Área da oficina:    http://localhost:{PORTA}/gravar.html")
     print(f"Pelo celular (mesma rede Wi-Fi): http://{ip}:{PORTA}/{EXEMPLO}")
     print("Ctrl+C para parar.")
     try:

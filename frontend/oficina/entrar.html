@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Entrar · Área da oficina</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../estilo.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="brandbar">
+    <img src="../logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
+    <div class="brandlinks"><span style="color:var(--brand);font-weight:600">Área da oficina</span></div>
+  </header>
+
+  <form class="card login" id="form">
+    <h2>Entrar</h2>
+    <div class="field"><label for="usuario">Usuário</label><input id="usuario" autocomplete="username" autocapitalize="none" required></div>
+    <div class="field"><label for="senha">Senha</label><input id="senha" type="password" autocomplete="current-password" required></div>
+    <div class="actions"><button class="b primary" type="submit">Entrar</button></div>
+    <div class="msg bad" id="msg" role="alert" hidden></div>
+  </form>
+</main>
+<script src="oficina.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+// Só volta para uma página da própria área da oficina.
+const volta = new URLSearchParams(location.search).get("volta");
+const destino = /^[a-z]+\.html$/.test(volta || "") && volta !== "entrar.html" ? volta : "frota.html";
+
+$("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("msg").hidden = true;
+  try {
+    await OFICINA.api("/api/entrar", { method: "POST", body: JSON.stringify({ usuario: $("usuario").value.trim(), senha: $("senha").value }) });
+    location.href = destino;
+  } catch (err) {
+    $("msg").textContent = err.message;
+    $("msg").hidden = false;
+    $("senha").select();
+  }
+});
+$("usuario").focus();
+</script>
+</body>
+</html>

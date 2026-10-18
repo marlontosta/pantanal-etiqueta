@@ -3,16 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Gravar Etiqueta NFC</title>
+<title>Gravar etiqueta · Área da oficina</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="estilo.css">
+<link rel="stylesheet" href="../estilo.css">
 
 </head>
 <body>
 <main class="wrap">
-  <header class="brandbar">
-    <img src="logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
-    <div class="brandlinks"><span style="color:var(--brand);font-weight:600">Área da oficina</span></div>
+  <header class="brandbar oficina">
+    <img src="../logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
+    <nav class="menu" aria-label="Área da oficina">
+      <a href="frota.html">Frota</a>
+      <a href="gravar.html">Gravar etiqueta</a>
+      <span class="quem"></span>
+      <button type="button" data-sair>Sair</button>
+    </nav>
   </header>
 
   <section class="card">
@@ -60,9 +65,11 @@
     <div class="actions">
       <button class="b primary" id="btnGravar" type="button">Gravar na etiqueta NFC</button>
       <button class="b" id="btnCopiar" type="button">Copiar link</button>
+      <button class="b" id="btnSalvar" type="button">Só salvar no sistema</button>
       <a class="b" id="btnAbrir" href="#" target="_blank" rel="noopener">Ver como o cliente</a>
     </div>
     <div class="msg" id="msg" hidden></div>
+    <div class="small" id="salvo" aria-live="polite">Gravar ou copiar o link também salva a visita no sistema, para a tela de frota.</div>
     <div class="field">
       <span class="lbl">QR code do mesmo link (alternativa à NFC)</span>
       <div class="qr" id="qr"></div>
@@ -71,12 +78,13 @@
 
   <footer class="small legend">
     <div>A gravação por NFC funciona no Chrome para Android, com a página publicada em https. Em outros aparelhos, copie o link e grave com um app de NFC (por exemplo, NFC Tools), ou imprima o QR code.</div>
-    <div class="foot-links"><span>Intervalos e contato ficam no arquivo config.js.</span><a href="index.html">Página do cliente</a></div>
+    <div class="foot-links"><span>Intervalos e contato ficam no arquivo config.js.</span><a id="linkCliente" href="../" target="_blank" rel="noopener">Página do cliente</a></div>
   </footer>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="config.js"></script>
+<script src="../config.js"></script>
+<script src="oficina.js"></script>
 <script>
 const CFG = window.ETIQUETA, U = window.ETQ;
 const $ = id => document.getElementById(id);
@@ -149,7 +157,7 @@ function montarLink() {
     p.push(s.c + "=" + (feitos[v] || v));
     feitos[v] = feitos[v] || s.c;
   }
-  let base = $("base").value.trim() || "https://seusite.com.br/etiqueta/";
+  let base = $("base").value.trim() || CFG.paginaCliente;
   base = base.split("?")[0];
   return base + (p.length ? "?" + p.join("&") : "");
 }
@@ -185,7 +193,31 @@ function carregar(url) {
   if (!$("base").value.trim()) $("base").value = url.split("?")[0];
   atualizar();
   aviso("ok", "Dados da etiqueta carregados" + ($("placa").value ? " para a placa " + $("placa").value : "") + ". Marque o que foi feito hoje e grave.");
+  // O histórico da etiqueta também vale para a frota (carros que ainda não estão no sistema).
+  salvar("leitura");
 }
+
+// Salva no backend o que está na tela (a etiqueta inteira). Repetir não duplica.
+async function salvar(origem) {
+  const placa = U.placa($("placa").value);
+  const servicos = [];
+  for (const s of CFG.servicos) {
+    const d = U.data($("dt-" + s.id).value);
+    if (d) servicos.push({ servico: s.id, km: U.km($("km-" + s.id).value), data: U.iso(d) });
+  }
+  if (placa.length !== 7 || !servicos.length) {
+    if (origem === "botao") $("salvo").textContent = "Para salvar, informe a placa e a data de pelo menos um serviço.";
+    return;
+  }
+  try {
+    await OFICINA.api("/api/registros", { method: "POST", body: JSON.stringify({ placa, servicos }) });
+    $("salvo").textContent = "Salvo no sistema: placa " + placa + ", " + servicos.length + (servicos.length === 1 ? " serviço." : " serviços.");
+  } catch (e) {
+    $("salvo").textContent = "Não salvou no sistema (" + e.message + "). A etiqueta não é afetada; tente \"Só salvar no sistema\".";
+  }
+}
+
+$("btnSalvar").addEventListener("click", () => salvar("botao"));
 
 // Ler etiqueta
 $("btnLer").addEventListener("click", async () => {
@@ -217,6 +249,7 @@ $("btnGravar").addEventListener("click", async () => {
     aviso("warn", "Aproxime a etiqueta do celular para gravar…");
     await new NDEFReader().write({ records: [{ recordType: "url", data: url }] }, { overwrite: true });
     aviso("ok", "Etiqueta gravada para a placa " + U.placa($("placa").value) + ". Encoste de novo para conferir a página.");
+    salvar("gravacao");
   } catch (e) {
     aviso("bad", "Não gravou (" + e.name + "). Confira se a etiqueta não está bloqueada e se tem espaço para " + $("tamanho").textContent.split(".")[0] + ".");
   }
@@ -225,7 +258,7 @@ $("btnGravar").addEventListener("click", async () => {
 $("btnCopiar").addEventListener("click", () => {
   const t = $("link");
   navigator.clipboard.writeText(t.value)
-    .then(() => aviso("ok", "Link copiado."))
+    .then(() => { aviso("ok", "Link copiado."); salvar("copia"); })
     .catch(() => { t.focus(); t.select(); aviso("warn", "Selecionei o link. Use Copiar do seu aparelho."); });
 });
 
@@ -246,8 +279,9 @@ $("base").addEventListener("input", atualizar);
 $("visitaDt").value = U.iso(new Date());
 let base = "";
 try { base = localStorage.getItem("etq:base") || ""; } catch (e) {}
-if (!base && /^https:/.test(location.href) && !/claude\.ai|claudeusercontent/.test(location.host)) base = new URL("./", location.href).href;
-$("base").value = base;
+$("base").value = base || CFG.paginaCliente;
+$("linkCliente").href = CFG.paginaCliente;
+OFICINA.menu();
 if (!nfc) $("btnGravar").textContent = "Gravar na etiqueta NFC (só Chrome Android)";
 atualizar();
 </script>
