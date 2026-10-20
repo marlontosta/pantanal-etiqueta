@@ -7,6 +7,7 @@ from app import config, db, main, seguranca
 @pytest.fixture
 def cliente(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "BANCO", tmp_path / "teste.db")
+    monkeypatch.setattr(config, "ARQUIVOS_OS", tmp_path / "os")
     monkeypatch.setattr(config, "COOKIE_SEGURO", False)
     seguranca._falhas.clear()
     main._envios.clear()

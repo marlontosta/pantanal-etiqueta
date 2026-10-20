@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Gravar etiqueta · Área da oficina</title>
+<title>Registrar visita · Área da oficina</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="../estilo.css">
 
@@ -14,15 +14,15 @@
     <img src="../logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
     <nav class="menu" aria-label="Área da oficina">
       <a href="frota.html">Frota</a>
-      <a href="gravar.html">Gravar etiqueta</a>
+      <a href="gravar.html">Registrar visita</a>
       <span class="quem"></span>
       <button type="button" data-sair>Sair</button>
     </nav>
   </header>
 
   <section class="card">
-    <h2>1. Carregar etiqueta</h2>
-    <p class="small" style="margin:0">Se o carro já tem etiqueta, leia os dados atuais para só atualizar o que mudou. Etiqueta nova: pule para o passo 2.</p>
+    <h2>1. Carregar dados</h2>
+    <p class="small" style="margin:0">Se o carro já tem etiqueta, leia os dados atuais para só atualizar o que mudou. Carro que já está no sistema é carregado ao digitar a placa. Carro novo: pule para o passo 2.</p>
     <div class="actions">
       <button class="b" id="btnLer" type="button">Ler etiqueta NFC</button>
     </div>
@@ -30,13 +30,24 @@
       <label for="colar">Ou cole o link da etiqueta</label>
       <input id="colar" type="url" placeholder="https://…?p=ABC1D23&amp;o=…" autocomplete="off">
     </div>
+    <div class="msg" id="msgCarregar" hidden></div>
   </section>
 
   <form class="card" id="form" novalidate>
     <h2>2. Dados da visita</h2>
     <div class="field">
+      <label for="pdf">PDF da OS (opcional)</label>
+      <input id="pdf" type="file" accept="application/pdf,.pdf">
+      <span class="small" id="pdfMsg">O PDF fica guardado no sistema com a visita. Se ele tiver texto, os campos abaixo são preenchidos com placa, cliente, telefone, km e serviços.</span>
+    </div>
+    <div class="field">
       <label for="placa">Placa</label>
       <input id="placa" type="text" maxlength="8" autocomplete="off" placeholder="ABC1D23" style="text-transform:uppercase;font-family:var(--display);font-size:1.4rem;letter-spacing:.08em">
+      <span class="small" id="placaMsg" aria-live="polite"></span>
+    </div>
+    <div class="grid2">
+      <div class="field"><label for="nome">Nome do cliente</label><input id="nome" type="text" maxlength="120" autocomplete="off" autocapitalize="words"></div>
+      <div class="field"><label for="telefone">Telefone</label><input id="telefone" type="tel" maxlength="20" autocomplete="off" placeholder="(67) 99999-9999"></div>
     </div>
     <div class="grid2">
       <div class="field"><label for="visitaKm">Km de hoje</label><input id="visitaKm" type="text" inputmode="numeric" autocomplete="off" placeholder="27.350"></div>
@@ -45,14 +56,18 @@
     <div class="field">
       <label for="os">Colar itens da OS (opcional)</label>
       <textarea id="os" rows="4" placeholder="Placa: ABC1D23&#10;KM do serviço: 27350&#10;244  TROCA DE OLEO E FILTROS COMPLETO PASSEIO  1  R$ 30,00 …"></textarea>
-      <span class="small" id="osMsg">Cole a placa, o km e os itens da ordem de serviço; os serviços reconhecidos são marcados como feitos hoje.</span>
+      <span class="small" id="osMsg">Cole a placa, o km e os itens da ordem de serviço; os serviços reconhecidos são marcados como feitos hoje. O texto do PDF aparece aqui.</span>
     </div>
     <p class="small" style="margin:0">Marque os serviços feitos nesta visita para preencher com o km e a data de hoje. Os outros mantêm o último registro.</p>
     <div id="servicos"></div>
+    <div class="actions">
+      <button class="b primary" id="btnSalvar" type="button">Salvar visita no sistema</button>
+    </div>
+    <div class="small" id="salvo" aria-live="polite">Salvar não depende da etiqueta: a visita, o cliente e o PDF vão para a tela de frota. A etiqueta pode ser gravada agora, no passo 3, ou depois pela tela de frota.</div>
   </form>
 
-  <section class="card">
-    <h2>3. Gravar</h2>
+  <section class="card" id="etiqueta">
+    <h2>3. Gravar etiqueta (opcional)</h2>
     <div class="field">
       <label for="base">Endereço da página do cliente</label>
       <input id="base" type="url" autocomplete="off" placeholder="https://seusite.com.br/etiqueta/">
@@ -65,11 +80,10 @@
     <div class="actions">
       <button class="b primary" id="btnGravar" type="button">Gravar na etiqueta NFC</button>
       <button class="b" id="btnCopiar" type="button">Copiar link</button>
-      <button class="b" id="btnSalvar" type="button">Só salvar no sistema</button>
       <a class="b" id="btnAbrir" href="#" target="_blank" rel="noopener">Ver como o cliente</a>
     </div>
     <div class="msg" id="msg" hidden></div>
-    <div class="small" id="salvo" aria-live="polite">Gravar ou copiar o link também salva a visita no sistema, para a tela de frota.</div>
+    <div class="small">Gravar ou copiar o link também salva a visita, se ela ainda não foi salva.</div>
     <div class="field">
       <span class="lbl">QR code do mesmo link (alternativa à NFC)</span>
       <div class="qr" id="qr"></div>
@@ -93,7 +107,8 @@ const nfc = "NDEFReader" in window;
 // Capacidade útil aproximada de cada chip para um link (bytes).
 const CHIPS = [["NTAG213", 137], ["NTAG215", 496], ["NTAG216", 868]];
 
-function aviso(tipo, texto) { const m = $("msg"); m.className = "msg " + tipo; m.textContent = texto; m.hidden = false; }
+function aviso(tipo, texto, alvo = "msg") { const m = $(alvo); m.className = "msg " + tipo; m.textContent = texto; m.hidden = false; }
+const fmtFone = s => { const d = String(s || "").replace(/\D/g, ""); return d.length === 10 ? "(" + d.slice(0, 2) + ") " + d.slice(2, 6) + "-" + d.slice(6) : U.fone(s); };
 
 // Monta as linhas de serviço
 const box = $("servicos");
@@ -125,13 +140,50 @@ function marcar(cb) {
   else { km.value = cb.dataset.km || ""; dt.value = cb.dataset.dt || ""; }
 }
 
-// Lê o texto colado da OS: placa e serviços reconhecidos pelos trechos "os" do config.js.
+// Nome em maiúsculas na OS vira "João da Silva".
+function capitalizar(nome) {
+  if (nome !== nome.toUpperCase()) return nome;
+  return nome.toLowerCase().replace(/(^|\s)(\S)/g, (m, e, l) => e + l.toUpperCase())
+    .replace(/ (Da|De|Do|Das|Dos|E) /g, m => m.toLowerCase());
+}
+
+// Nome do cliente: o que vem depois de "Cliente:" (ou "Proprietário:", "Nome:") até o próximo campo da linha.
+function lerNome(texto) {
+  for (const rotulo of ["cliente", "propriet[aá]rio", "nome do cliente", "nome"]) {
+    const m = texto.match(new RegExp("(?:^|[\\s|])" + rotulo + "\\s*:\\s*([^\\n]+)", "i"));
+    if (!m) continue;
+    const nome = m[1].split(/\s{2,}|\s+(?:cpf|cnpj|rg|tel|telefone|fone|celular|cel|whats\w*|e-?mail|placa|ve[ií]culo|data|endere[cç]o|c[oó]d)\b/i)[0]
+      .replace(/^\d+\s*[-–]\s*/, "").replace(/[\s,;:.-]+$/, "").trim();
+    if (/[A-Za-zÀ-ú]{2}/.test(nome)) return capitalizar(nome).slice(0, 120);
+  }
+  return "";
+}
+
+// Telefone do cliente: primeiro o que tem rótulo (Telefone, Celular…), depois qualquer número; nunca o da oficina.
+function lerTelefone(t) {
+  const fone = "\\(?\\d{2}\\)?\\s*9?\\s?\\d{4}[\\s.-]?\\d{4}";
+  const daOficina = String(CFG.oficina.whatsapp).replace(/^55/, "");
+  const candidatos = [
+    ...t.matchAll(new RegExp("(?:TELEFONE|TEL|FONE|CELULAR|CEL|WHATSAPP|CONTATO)\\.?\\s*:?\\s*(?:\\+?55\\s*)?(" + fone + ")", "g")),
+    ...t.matchAll(new RegExp("(?<![\\d/])(" + fone + ")(?![\\d/])", "g"))
+  ].map(m => m[1].replace(/\D/g, ""));
+  return candidatos.find(d => (d.length === 10 || d.length === 11) && d !== daOficina) || "";
+}
+
+// Lê o texto da OS (colado ou do PDF): placa, cliente, telefone, km, data e serviços pelos trechos "os" do config.js.
 function lerOS(texto) {
-  const t = texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+  const t = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
   const mp = t.match(/PLACA\s*:?\s*([A-Z]{3}-?\d[A-Z0-9]\d{2})/);
   if (mp) $("placa").value = U.placa(mp[1]);
-  const mk = t.match(/\bKM\b[^:\n]*:\s*([\d.]+)/);
+  const nome = lerNome(texto), tel = lerTelefone(t);
+  if (nome) $("nome").value = nome;
+  if (tel) $("telefone").value = fmtFone(tel);
+  const mk = t.match(/(?:\bKM\b|QUILOMETRAGEM|HODOMETRO|ODOMETRO)[^:\n]{0,25}:\s*([\d.]+)/);
   if (mk) $("visitaKm").value = fmtKm(U.km(mk[1]));
+  // Data da OS (para registrar uma visita antiga); data no futuro ou de nascimento não vale.
+  const md = t.match(/(?:DATA|EMISSAO|ENTRADA|ABERTURA)(?![^:\n]*NASC)[^:\n]{0,20}:\s*(\d{2}\/\d{2}\/\d{4})/);
+  const dOS = md && U.data(md[1]);
+  if (dOS && dOS <= new Date()) $("visitaDt").value = U.iso(dOS);
   const achados = [];
   for (const s of CFG.servicos) {
     if (!(s.os || []).some(k => t.includes(k))) continue;
@@ -141,8 +193,103 @@ function lerOS(texto) {
   }
   preencherFeitos();
   $("osMsg").textContent = (mp ? "Placa " + U.placa(mp[1]) + ". " : "Placa não encontrada. ") +
+    (nome ? "Cliente " + nome + ". " : "") + (tel ? "Telefone " + fmtFone(tel) + ". " : "") +
+    (dOS && dOS <= new Date() ? "Data " + md[1] + ". " : "") +
     (achados.length ? "Marcados: " + achados.join(", ") + "." : "Nenhum serviço da etiqueta encontrado.") +
     ($("visitaKm").value ? "" : " Falta o km de hoje.");
+  if (mp) buscarNoSistema();
+}
+
+// PDF da OS: o texto é extraído no próprio navegador (pdf.js) e passa pelo mesmo leitor do texto colado.
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdfjs = null;
+function carregarPdfJs() {
+  return pdfjs ||= new Promise((ok, erro) => {
+    const s = document.createElement("script");
+    s.src = PDFJS + "pdf.min.js";
+    s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; ok(pdfjsLib); };
+    s.onerror = () => { pdfjs = null; erro(new Error("sem internet para ler o PDF")); };
+    document.head.append(s);
+  });
+}
+
+async function textoDoPdf(arquivo) {
+  const lib = await carregarPdfJs();
+  const doc = await lib.getDocument({ data: await arquivo.arrayBuffer() }).promise;
+  const linhas = [];
+  for (let n = 1; n <= Math.min(doc.numPages, 5); n++) {
+    const itens = (await (await doc.getPage(n)).getTextContent()).items.filter(i => i.str && i.str.trim());
+    // Junta os pedaços que estão na mesma altura da página, da esquerda para a direita.
+    const porY = [];
+    for (const i of itens) {
+      const x = i.transform[4], y = i.transform[5], h = Math.abs(i.transform[3]) || i.height || 10;
+      let l = porY.find(l => Math.abs(l.y - y) < l.h * 0.5);
+      if (!l) porY.push(l = { y, h, itens: [] });
+      l.itens.push({ x, w: i.width, s: i.str });
+    }
+    porY.sort((a, b) => b.y - a.y);
+    for (const l of porY) {
+      l.itens.sort((a, b) => a.x - b.x);
+      let txt = "", fim = null;
+      // Espaço grande entre pedaços separa colunas (vira 3 espaços, que encerram o nome do cliente).
+      for (const i of l.itens) {
+        if (fim != null) txt += i.x - fim > l.h ? "   " : i.x - fim > l.h * 0.15 && !/\s$/.test(txt) ? " " : "";
+        txt += i.s;
+        fim = i.x + i.w;
+      }
+      linhas.push(txt.trimEnd());
+    }
+  }
+  return linhas.join("\n");
+}
+
+$("pdf").addEventListener("change", async () => {
+  const f = $("pdf").files[0];
+  pdfSalvo = "";
+  alterado();
+  if (!f) { $("pdfMsg").textContent = "Nenhum PDF escolhido."; return; }
+  if (f.size > 10 * 1024 * 1024) { $("pdfMsg").textContent = "PDF maior que 10 MB; escolha outro."; $("pdf").value = ""; return; }
+  $("pdfMsg").textContent = "Lendo o PDF…";
+  try {
+    const texto = await textoDoPdf(f);
+    if (texto.replace(/\s/g, "").length < 20) {
+      $("pdfMsg").textContent = "O PDF não tem texto (parece imagem escaneada). Ele será guardado, mas preencha os campos à mão.";
+      return;
+    }
+    $("os").value = texto;
+    lerOS(texto);
+    atualizar();
+    $("pdfMsg").textContent = "Campos preenchidos pelo PDF; confira antes de salvar. O PDF vai junto ao salvar a visita.";
+  } catch (e) {
+    $("pdfMsg").textContent = "Não consegui ler o texto do PDF (" + e.message + "). Ele será guardado mesmo assim; preencha os campos à mão.";
+  }
+});
+
+// Carro que já está no sistema: completa cliente, telefone e serviços que estiverem em branco.
+let placaBuscada = "";
+async function buscarNoSistema(forcar) {
+  const placa = U.placa($("placa").value);
+  if (placa.length !== 7 || (placa === placaBuscada && !forcar)) return;
+  placaBuscada = placa;
+  let d;
+  try { d = await OFICINA.api("/api/veiculos/" + placa); }
+  catch (e) { $("placaMsg").textContent = e.message === "Placa sem registros." ? "Placa nova no sistema." : ""; return; }
+  if (U.placa($("placa").value) !== placa) return;
+  const preenchidos = [];
+  if (!$("nome").value.trim() && d.cliente.nome) { $("nome").value = d.cliente.nome; preenchidos.push("cliente"); }
+  if (!$("telefone").value.trim() && d.cliente.telefone) { $("telefone").value = fmtFone(d.cliente.telefone); preenchidos.push("telefone"); }
+  // Os serviços só vêm do sistema se a tela ainda não tem nenhum (etiqueta lida ou digitada vale mais).
+  const vazio = CFG.servicos.every(s => !$("km-" + s.id).value && !$("dt-" + s.id).value);
+  if (vazio && d.servicos.length) {
+    for (const s of d.servicos) {
+      $("km-" + s.servico).value = fmtKm(s.ultimo_km);
+      $("dt-" + s.servico).value = s.ultima_data;
+    }
+    preenchidos.push("últimos serviços");
+  }
+  $("placaMsg").textContent = "Placa já está no sistema" + (d.ultima_visita ? ", última visita em " + U.data(d.ultima_visita).toLocaleDateString("pt-BR") : "") +
+    "." + (preenchidos.length ? " Preenchido: " + preenchidos.join(", ") + "." : "");
+  atualizar();
 }
 
 function montarLink() {
@@ -172,6 +319,7 @@ function atualizar() {
   $("tamanho").textContent = bytes + " bytes. " + (cabe.length ? "Cabe em: " + cabe.join(", ") + "." : "Grande demais para as etiquetas comuns.");
   const ok = U.placa($("placa").value).length === 7;
   $("btnGravar").disabled = !ok;
+  $("btnSalvar").disabled = !ok;
   $("btnGravar").title = ok ? "" : "Informe a placa com 7 caracteres";
   const q = $("qr"); q.replaceChildren();
   if (window.QRCode) new QRCode(q, { text: url, width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
@@ -191,12 +339,20 @@ function carregar(url) {
   }
   if (!$("base").value.trim()) $("base").value = url.split("?")[0];
   atualizar();
-  aviso("ok", "Dados da etiqueta carregados" + ($("placa").value ? " para a placa " + $("placa").value : "") + ". Marque o que foi feito hoje e grave.");
+  aviso("ok", "Dados da etiqueta carregados" + ($("placa").value ? " para a placa " + $("placa").value : "") + ". Marque o que foi feito hoje e salve.", "msgCarregar");
+  buscarNoSistema();
   // O histórico da etiqueta também vale para a frota (carros que ainda não estão no sistema).
   salvar("leitura");
 }
 
-// Salva no backend o que está na tela (a etiqueta inteira). Repetir não duplica.
+// Salva no backend o que está na tela: serviços (a etiqueta inteira), cliente e PDF da OS. Repetir não duplica.
+// origem "leitura" (etiqueta lida) só manda os serviços.
+let salvoAgora = false, pdfSalvo = "";
+function alterado() {
+  if (salvoAgora) $("salvo").textContent = "Há alterações que ainda não foram salvas.";
+  salvoAgora = false;
+}
+
 async function salvar(origem) {
   const placa = U.placa($("placa").value);
   const servicos = [];
@@ -204,15 +360,37 @@ async function salvar(origem) {
     const d = U.data($("dt-" + s.id).value);
     if (d) servicos.push({ servico: s.id, km: U.km($("km-" + s.id).value), data: U.iso(d) });
   }
-  if (placa.length !== 7 || !servicos.length) {
-    if (origem === "botao") $("salvo").textContent = "Para salvar, informe a placa e a data de pelo menos um serviço.";
+  const leitura = origem === "leitura", pdf = leitura ? null : $("pdf").files[0];
+  const nome = leitura ? "" : $("nome").value.trim(), telefone = leitura ? "" : $("telefone").value.trim();
+  if (placa.length !== 7 || (!servicos.length && !nome && !telefone && !pdf)) {
+    if (origem === "botao") $("salvo").textContent = "Para salvar, informe a placa e pelo menos um serviço, o cliente ou o PDF da OS.";
     return;
   }
+  // Depois de gravar ou copiar, só salva se ainda não salvou.
+  if ((origem === "gravacao" || origem === "copia") && salvoAgora) return;
+  const dataVisita = $("visitaDt").value || U.iso(new Date());
+  $("btnSalvar").disabled = true;
   try {
-    await OFICINA.api("/api/registros", { method: "POST", body: JSON.stringify({ placa, servicos }) });
-    $("salvo").textContent = "Salvo no sistema: placa " + placa + ", " + servicos.length + (servicos.length === 1 ? " serviço." : " serviços.");
+    const corpo = { placa, servicos };
+    if (!leitura) Object.assign(corpo, { nome, telefone });
+    await OFICINA.api("/api/registros", { method: "POST", body: JSON.stringify(corpo) });
+    let txtPdf = "";
+    const chavePdf = pdf && [pdf.name, pdf.size, pdf.lastModified, placa, dataVisita].join("|");
+    if (pdf && chavePdf !== pdfSalvo) {
+      const q = new URLSearchParams({ placa, data: dataVisita, nome: pdf.name });
+      const km = U.km($("visitaKm").value);
+      if (km != null) q.set("km", km);
+      await OFICINA.api("/api/ordens?" + q, { method: "POST", body: pdf, headers: { "Content-Type": "application/pdf" } });
+      pdfSalvo = chavePdf;
+    }
+    if (pdf) txtPdf = ", PDF da OS";
+    if (!leitura) { salvoAgora = true; $("placaMsg").textContent = ""; }
+    $("salvo").textContent = "Salvo no sistema: placa " + placa + ", " + servicos.length + (servicos.length === 1 ? " serviço" : " serviços") +
+      (nome || telefone ? ", cliente" : "") + txtPdf + ". A etiqueta pode ser gravada agora ou depois pela tela de frota.";
   } catch (e) {
-    $("salvo").textContent = "Não salvou no sistema (" + e.message + "). A etiqueta não é afetada; tente \"Só salvar no sistema\".";
+    $("salvo").textContent = "Não salvou no sistema (" + e.message + "). Confira os dados e clique em \"Salvar visita no sistema\" de novo.";
+  } finally {
+    atualizar();
   }
 }
 
@@ -266,8 +444,9 @@ $("form").addEventListener("input", e => {
   const t = e.target;
   if (t.id === "os") lerOS(t.value);
   if (t.inputMode === "numeric") { const n = U.km(t.value); t.value = n == null ? "" : fmtKm(Math.min(n, 9999999)); }
-  if (t.id === "placa") t.value = U.placa(t.value);
+  if (t.id === "placa") { t.value = U.placa(t.value); $("placaMsg").textContent = ""; buscarNoSistema(); }
   if (t.type === "checkbox") marcar(t);
+  if (t.id !== "pdf") alterado();
   if (t.id === "visitaKm" || t.id === "visitaDt") preencherFeitos();
   atualizar();
 });
@@ -282,6 +461,12 @@ $("linkCliente").href = CFG.paginaCliente;
 OFICINA.menu();
 if (!nfc) $("btnGravar").textContent = "Gravar na etiqueta NFC (só Chrome Android)";
 atualizar();
+// Vindo da tela de frota (?placa=…): carrega o carro do sistema; "#etiqueta" vai direto para a gravação.
+const placaUrl = U.placa(new URLSearchParams(location.search).get("placa"));
+if (placaUrl) {
+  $("placa").value = placaUrl;
+  buscarNoSistema().then(() => { if (location.hash === "#etiqueta") $("etiqueta").scrollIntoView(); });
+}
 </script>
 </body>
 </html>

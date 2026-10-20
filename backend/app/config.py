@@ -8,6 +8,9 @@ FRONTEND = RAIZ / "frontend"
 
 # Banco SQLite. Em hospedagem, aponte para um disco que não se apaga a cada deploy.
 BANCO = pathlib.Path(os.environ.get("PANTANAL_BANCO", RAIZ / "backend" / "dados" / "pantanal.db"))
+# PDFs das ordens de serviço: por padrão numa pasta "os" ao lado do banco, no mesmo disco.
+ARQUIVOS_OS = pathlib.Path(os.environ.get("PANTANAL_ARQUIVOS_OS", BANCO.parent / "os"))
+OS_TAMANHO_MAXIMO = 10 * 1024 * 1024
 # Cookie só por https em produção; em http local precisa ser 0.
 COOKIE_SEGURO = os.environ.get("PANTANAL_COOKIE_SEGURO", "1") != "0"
 SESSAO_DIAS = int(os.environ.get("PANTANAL_SESSAO_DIAS", "30"))

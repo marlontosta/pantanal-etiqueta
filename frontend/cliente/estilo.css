@@ -119,6 +119,7 @@ h1 { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.05; text-wra
 .card h2 { margin: 0; font-family: var(--display); font-size: 1.35rem; font-weight: 600; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field label, .field .lbl { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.field input[type="file"] { font-size: .95rem; padding: 8px; }
 .field input, .field textarea { font: 500 1.05rem var(--body); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-width: 0; width: 100%; }
 .field textarea { font: .85rem/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; word-break: break-all; }
 .field input:focus-visible, .field textarea:focus-visible { outline: 3px solid var(--brand); outline-offset: 1px; }
@@ -168,6 +169,9 @@ h1 { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.05; text-wra
 .tabela tbody tr.linha:hover { background: var(--bg); }
 .tabela tbody tr.linha:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .tabela .placa-txt { font: 700 1.05rem var(--display); letter-spacing: .06em; }
+.tabela .cli-nome { display: block; font-size: .8rem; color: var(--muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.tabela tr.detalhe a:not(.b) { color: var(--accent); }
+.tabela tr.detalhe .actions { margin-top: 10px; }
 .tabela .est { color: var(--muted); font-size: .8em; }
 .tabela .est.cli { color: var(--accent); cursor: help; }
 .tabela tr.detalhe td { white-space: normal; background: var(--bg); padding: 12px 14px; }

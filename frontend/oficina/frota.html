@@ -13,7 +13,7 @@
     <img src="../logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
     <nav class="menu" aria-label="Área da oficina">
       <a href="frota.html">Frota</a>
-      <a href="gravar.html">Gravar etiqueta</a>
+      <a href="gravar.html">Registrar visita</a>
       <span class="quem"></span>
       <button type="button" data-sair>Sair</button>
     </nav>
@@ -27,7 +27,7 @@
 
   <section class="card" aria-label="Filtros">
     <div class="filtros">
-      <div class="field"><label for="fPlaca">Placa</label><input id="fPlaca" type="search" autocomplete="off" placeholder="ABC1D23" style="text-transform:uppercase"></div>
+      <div class="field"><label for="fPlaca">Placa ou cliente</label><input id="fPlaca" type="search" autocomplete="off" placeholder="ABC1D23 ou nome"></div>
       <div class="field"><label for="fStatus">Situação</label>
         <select id="fStatus"><option value="">Todas</option><option value="bad">Vencida</option><option value="warn">Próxima</option><option value="ok">Em dia</option></select></div>
       <div class="field"><label for="fServico">Serviço</label><select id="fServico"><option value="">Mais urgente</option></select></div>
@@ -68,7 +68,12 @@ const abertos = new Set();
 
 // Linha da tabela: o carro e o serviço mostrado (o mais urgente, ou o filtrado).
 const COLS = [
-  { k: "placa", t: "Placa", v: x => x.v.placa, f: x => el("span", "placa-txt", x.v.placa) },
+  { k: "placa", t: "Placa", v: x => x.v.placa, f: x => {
+      const s = el("span", null);
+      s.append(el("span", "placa-txt", x.v.placa));
+      if (x.v.cliente.nome) s.append(el("span", "cli-nome", x.v.cliente.nome));
+      return s;
+    } },
   { k: "visita", t: "Última visita", v: x => x.v.ultima_visita, f: x => fmtData(x.v.ultima_visita) },
   { k: "kmvisita", t: "Km na visita", n: 1, v: x => x.v.ultimo_km, f: x => fmtKm(x.v.ultimo_km) },
   { k: "kmdia", t: "Km/dia", n: 1, v: x => x.v.km_por_dia, f: x => x.v.km_por_dia == null ? "–" : x.v.km_por_dia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) },
@@ -108,15 +113,17 @@ function montarCabecalho() {
   }
 }
 
+const semAcento = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
 function linhasFiltradas() {
-  const placa = $("fPlaca").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const busca = semAcento($("fPlaca").value).trim(), placa = busca.replace(/[^A-Z0-9]/g, "");
   const servico = $("fServico").value, prazo = $("fPrazo").value, visita = $("fVisita").value;
   const hj = Date.parse(hoje);
   const linhas = [];
   for (const v of veiculos) {
     const s = servico ? v.servicos.find(i => i.servico === servico) : v.proxima;
     if (servico && !s) continue;
-    if (placa && !v.placa.includes(placa)) continue;
+    if (busca && !(placa && v.placa.includes(placa)) && !semAcento(v.cliente.nome).includes(busca)) continue;
     if (prazo !== "") {
       // "Já vencida": dias negativos. "Nos próximos N dias": de hoje até N, sem as vencidas.
       if (!s || (+prazo === 0 ? s.falta_dias >= 0 : s.falta_dias < 0 || s.falta_dias > +prazo)) continue;
@@ -172,7 +179,7 @@ function render() {
     if (abertos.has(x.v.placa)) corpo.append(detalhe(x.v));
   }
   if (!linhas.length) {
-    const td = el("td", "vazio", veiculos.length ? "Nenhum veículo com esses filtros." : "Nenhum veículo registrado ainda. Os carros aparecem aqui quando a etiqueta é gravada ou lida na tela Gravar etiqueta.");
+    const td = el("td", "vazio", veiculos.length ? "Nenhum veículo com esses filtros." : "Nenhum veículo registrado ainda. Os carros aparecem aqui quando uma visita é salva (ou uma etiqueta é lida) na tela Registrar visita.");
     td.colSpan = COLS.length;
     corpo.append(el("tr"));
     corpo.lastChild.append(td);
@@ -197,10 +204,38 @@ function detalhe(v) {
     tb.append(r);
   }
   t.append(tb);
-  const hist = el("p", "small", "Carregando histórico…"), leit = el("p", "small");
-  td.append(t, hist, leit);
+  const cli = el("p", "small"), hist = el("p", "small", "Carregando histórico…"), leit = el("p", "small"), oss = el("p", "small");
+  // Gravar a etiqueta (ou registrar nova visita) com os dados do sistema, na tela de visita.
+  const acoes = el("div", "actions");
+  const gravar = el("a", "b primary", "Gravar etiqueta com estes dados");
+  gravar.href = "gravar.html?placa=" + v.placa + "#etiqueta";
+  const nova = el("a", "b", "Registrar nova visita");
+  nova.href = "gravar.html?placa=" + v.placa;
+  acoes.append(gravar, nova);
+  td.append(cli, t, hist, oss, leit, acoes);
   tr.append(td);
+  if (v.cliente.nome || v.cliente.telefone) {
+    cli.append("Cliente: " + (v.cliente.nome || "sem nome"));
+    if (v.cliente.telefone) {
+      const w = el("a", null, CFG_FONE(v.cliente.telefone));
+      w.href = "https://wa.me/55" + v.cliente.telefone;
+      w.target = "_blank"; w.rel = "noopener";
+      cli.append(" · ", w);
+    }
+  } else cli.textContent = "Cliente: não informado.";
   OFICINA.api("/api/veiculos/" + v.placa).then(d => {
+    // PDFs das OS guardados nas visitas; abrem numa aba nova.
+    if (d.ordens.length) {
+      oss.append("OS em PDF: ");
+      d.ordens.forEach((o, i) => {
+        const a = el("a", null, fmtData(o.data) + (o.km != null ? " (" + fmtKm(o.km) + " km)" : ""));
+        a.href = "/api/ordens/" + o.id;
+        a.target = "_blank"; a.rel = "noopener";
+        a.title = o.nome_arquivo;
+        if (i) oss.append(" · ");
+        oss.append(a);
+      });
+    }
     const nomes = Object.fromEntries(CFG.servicos.map(s => [s.id, s.nome]));
     const porData = {};
     for (const r of d.historico) (porData[r.data] ||= { km: r.km, itens: [] }).itens.push(nomes[r.servico] || r.servico);
@@ -214,6 +249,7 @@ function detalhe(v) {
 }
 
 const CFG = window.ETIQUETA;
+const CFG_FONE = d => d.length === 10 ? "(" + d.slice(0, 2) + ") " + d.slice(2, 6) + "-" + d.slice(6) : window.ETQ.fone(d);
 for (const s of CFG.servicos) { const o = el("option", null, s.nome); o.value = s.id; $("fServico").append(o); }
 for (const id of ["fPlaca", "fStatus", "fServico", "fPrazo", "fVisita"]) $(id).addEventListener("input", render);
 for (const b of document.querySelectorAll(".summary .chip"))

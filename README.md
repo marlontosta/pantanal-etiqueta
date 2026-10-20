@@ -20,7 +20,7 @@ etiqueta/
 │   └── oficina/         ← área da oficina, servida pelo backend, exige login
 │       ├── entrar.html  login
 │       ├── frota.html   veículos por placa: km atual, km/dia, próxima manutenção
-│       ├── gravar.html  lê, monta e grava o link na etiqueta; salva a visita
+│       ├── gravar.html  registra a visita (cliente, serviços, PDF da OS) e grava a etiqueta
 │       └── oficina.js   chamadas à API e menu
 ├── backend/             ← API em Python (FastAPI + SQLite)
 │   ├── app/
@@ -87,6 +87,7 @@ Testes: `pip install -r requirements-dev.txt && python -m pytest`.
 | `PANTANAL_BANCO`          | `backend/dados/pantanal.db`  | arquivo do banco; precisa ficar num disco que não se apaga |
 | `PANTANAL_COOKIE_SEGURO`  | `1`                          | cookie só por https                               |
 | `PANTANAL_SESSAO_DIAS`    | `30`                         | quantos dias o login dura                         |
+| `PANTANAL_ARQUIVOS_OS`    | pasta `os` ao lado do banco  | onde ficam os PDFs das OS                         |
 | `PANTANAL_USUARIO` / `PANTANAL_SENHA` | –                | cria esse usuário na primeira vez, se o banco não tiver nenhum (para hospedagens sem terminal) |
 
 ### Usuários
@@ -103,10 +104,22 @@ usuário até a janela passar.
 
 ### O que é salvo
 
-Ao gravar a etiqueta, copiar o link ou clicar em "Só salvar no sistema", a tela de gravar envia
-ao backend todos os serviços que estão na tela (placa, serviço, km e data). Ler uma etiqueta
-também salva o que ela tem, para carros que ainda não estão no sistema. O mesmo serviço na
-mesma placa e no mesmo dia não duplica.
+A tela "Registrar visita" (`gravar.html`) salva a visita com o botão "Salvar visita no sistema",
+sem depender da etiqueta: placa, nome e telefone do cliente, todos os serviços que estão na tela
+(serviço, km e data) e o PDF da OS. Gravar a etiqueta ou copiar o link também salva, se a visita
+ainda não foi salva. Ler uma etiqueta salva os serviços que ela tem, para carros que ainda não
+estão no sistema. O mesmo serviço na mesma placa e no mesmo dia não duplica.
+
+- **Cliente**: um nome e um telefone por placa (tabela `clientes`); vale o último informado, e
+  campo vazio não apaga o que já estava salvo. Ao digitar uma placa que já está no sistema, a
+  tela completa cliente, telefone e, se ainda estiverem em branco, os últimos serviços.
+- **PDF da OS**: até 10 MB, guardado na pasta `PANTANAL_ARQUIVOS_OS` (por padrão
+  `backend/dados/os/`, no mesmo disco do banco) com o nome igual ao hash do conteúdo; o mesmo
+  PDF de novo não duplica. Na tela de frota, o detalhe da placa lista as OS e abre o PDF.
+- **Leitura do PDF**: se o PDF tiver texto (não for imagem escaneada), o navegador extrai o
+  texto com pdf.js e preenche placa, cliente (`Cliente:`, `Proprietário:` ou `Nome:`), telefone
+  (`Telefone`, `Celular`, `Fone`… ou o primeiro número que não seja o da oficina), km, data da
+  OS e serviços, igual ao texto colado. Os campos podem ser corrigidos antes de salvar.
 
 Na página do cliente, o km que ele digita em "Quilometragem atual" é enviado ao backend
 (`envioKm` no `config.js`) uns segundos depois que ele para de digitar, só se for maior que o
@@ -120,8 +133,10 @@ uma visita posterior ou se exigir mais de 1.500 km por dia; e cada endereço IP 
 
 Uma linha por placa, com última visita, km na visita, km/dia, km atual, próxima manutenção,
 previsão, dias e km que faltam e situação. Clique em qualquer coluna para ordenar (de novo
-inverte). Filtros: placa, situação, serviço, prazo da previsão e data da última visita. Clicar
-numa linha mostra todos os serviços do carro e o histórico de visitas.
+inverte). Filtros: placa ou nome do cliente, situação, serviço, prazo da previsão e data da última
+visita. Clicar numa linha mostra cliente e telefone (link para o WhatsApp), todos os serviços do
+carro, o histórico de visitas, os PDFs das OS e os botões "Gravar etiqueta com estes dados" (abre
+a tela de visita com o carro carregado, direto na gravação) e "Registrar nova visita".
 
 - **Km/dia**: (último km conhecido − primeiro) ÷ dias entre eles, contando as visitas e o km
   digitado pelo cliente. Precisa de pelo menos dois dias com km e 7 dias entre eles; km que
@@ -140,14 +155,16 @@ numa linha mostra todos os serviços do carro e o histórico de visitas.
 | `POST /api/entrar`         | `{usuario, senha}` → cookie de sessão      |
 | `POST /api/sair`           | encerra a sessão                           |
 | `GET /api/eu`              | usuário logado                             |
-| `POST /api/registros`      | `{placa, servicos: [{servico, km, data}]}` |
+| `POST /api/registros`      | `{placa, nome?, telefone?, servicos: [{servico, km, data}]}` |
+| `POST /api/ordens?placa=&data=&km=&nome=` | corpo = o PDF da OS (`application/pdf`) |
+| `GET /api/ordens/{id}`     | abre o PDF de uma OS                        |
 | `POST /api/leituras`       | `{placa, km}` do cliente, sem login         |
 | `GET /api/frota`           | resumo de todas as placas                  |
 | `GET /api/veiculos/{placa}`| resumo e histórico de uma placa            |
 
 ## Montar o link a partir da OS
 
-Em `frontend/oficina/gravar.html`, cole no campo "Colar itens da OS" a placa, o km e os itens da ordem de serviço.
+Em `frontend/oficina/gravar.html`, escolha o PDF da OS ou cole no campo "Colar itens da OS" a placa, o km e os itens da ordem de serviço.
 A página reconhece `Placa: LMV4G22`, `KM do serviço: 95178` e marca como feitos hoje os
 serviços cujas descrições contêm os trechos do campo `os` de cada serviço no `config.js`
 (`TROCA DE OLEO`; `REVISAO`, `SUSPENS`, `FREIO`, `AMORTECEDOR`, `BIELETA`, `TERMINAL`, `BANDEJA`, `PASTILHA` ou `AXIAL`; `ALINHAMENTO`, `BALANCEAMENTO` ou `GEOMETRIA`; `HIGIENIZ`). Os demais itens da OS são ignorados.

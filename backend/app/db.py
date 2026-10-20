@@ -1,4 +1,4 @@
-"""Banco SQLite: usuários, sessões, registros de serviço e km informados pelos clientes."""
+"""Banco SQLite: usuários, sessões, registros de serviço, clientes, ordens de serviço e km informados pelos clientes."""
 import sqlite3
 from contextlib import contextmanager
 
@@ -38,6 +38,27 @@ CREATE TABLE IF NOT EXISTS leituras_cliente (
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (placa, data)
 );
+-- Nome e telefone do dono de cada placa. Vale o último informado na tela de visita.
+CREATE TABLE IF NOT EXISTS clientes (
+  placa TEXT PRIMARY KEY,
+  nome TEXT NOT NULL DEFAULT '',
+  telefone TEXT NOT NULL DEFAULT '',
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- PDF da OS de uma visita. O arquivo fica em config.ARQUIVOS_OS com o nome igual ao sha256 do conteúdo.
+CREATE TABLE IF NOT EXISTS ordens (
+  id INTEGER PRIMARY KEY,
+  placa TEXT NOT NULL,
+  data TEXT NOT NULL,
+  km INTEGER,
+  arquivo TEXT NOT NULL,
+  nome_arquivo TEXT NOT NULL DEFAULT '',
+  tamanho INTEGER NOT NULL,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (placa, arquivo)
+);
+CREATE INDEX IF NOT EXISTS ordens_placa ON ordens (placa, data);
 """
 
 
