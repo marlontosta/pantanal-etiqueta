@@ -54,6 +54,7 @@
     <div>Previsão é a data mais próxima entre o prazo em meses e o dia estimado em que o carro chega no km da próxima troca. Clique numa linha para ver todos os serviços e o histórico.</div>
   </footer>
 </main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="../config.js"></script>
 <script src="oficina.js"></script>
 <script>
@@ -208,11 +209,25 @@ function detalhe(v) {
   // Gravar a etiqueta (ou registrar nova visita) com os dados do sistema, na tela de visita.
   const acoes = el("div", "actions");
   const gravar = el("a", "b primary", "Gravar etiqueta com estes dados");
-  gravar.href = "gravar.html?placa=" + v.placa + "#etiqueta";
+  gravar.href = "gravar.html?placa=" + v.placa + "&etiqueta=1";
   const nova = el("a", "b", "Registrar nova visita");
   nova.href = "gravar.html?placa=" + v.placa;
-  acoes.append(gravar, nova);
-  td.append(cli, t, hist, oss, leit, acoes);
+  // No computador não dá para gravar NFC: o QR abre a mesma tela no celular.
+  const btnQr = el("button", "b", "QR para gravar pelo celular");
+  btnQr.type = "button";
+  const qrBox = el("div", "celular");
+  qrBox.hidden = true;
+  btnQr.addEventListener("click", () => {
+    qrBox.hidden = !qrBox.hidden;
+    if (qrBox.hidden || qrBox.childElementCount) return;
+    const q = el("div", "qr");
+    const url = new URL(gravar.getAttribute("href"), location.href).href;
+    if (window.QRCode) new QRCode(q, { text: url, width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
+    else q.textContent = "O QR code precisa de internet para aparecer.";
+    qrBox.append(q, el("div", "small", "Leia com o celular (Chrome no Android, logado na área da oficina) para gravar a etiqueta da placa " + v.placa + " por NFC."));
+  });
+  acoes.append(gravar, btnQr, nova);
+  td.append(cli, t, hist, oss, leit, acoes, qrBox);
   tr.append(td);
   if (v.cliente.nome || v.cliente.telefone) {
     cli.append("Cliente: " + (v.cliente.nome || "sem nome"));

@@ -27,7 +27,7 @@
 const $ = id => document.getElementById(id);
 // Só volta para uma página da própria área da oficina.
 const volta = new URLSearchParams(location.search).get("volta");
-const destino = /^[a-z]+\.html$/.test(volta || "") && volta !== "entrar.html" ? volta : "frota.html";
+const destino = /^[a-z]+\.html(\?[A-Za-z0-9=&%-]*)?$/.test(volta || "") && !volta.startsWith("entrar.html") ? volta : "frota.html";
 
 $("form").addEventListener("submit", async e => {
   e.preventDefault();

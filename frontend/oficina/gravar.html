@@ -68,6 +68,10 @@
 
   <section class="card" id="etiqueta">
     <h2>3. Gravar etiqueta (opcional)</h2>
+    <div class="celular" id="celular" hidden>
+      <div class="qr" id="qrCelular"></div>
+      <div class="small"><b>No computador?</b> Leia este QR code com o celular (Chrome no Android, logado na área da oficina) para abrir esta placa com os dados salvos e gravar a etiqueta por NFC. <span id="celularMsg"></span></div>
+    </div>
     <div class="field">
       <label for="base">Endereço da página do cliente</label>
       <input id="base" type="url" autocomplete="off" placeholder="https://seusite.com.br/etiqueta/">
@@ -85,7 +89,7 @@
     <div class="msg" id="msg" hidden></div>
     <div class="small">Gravar ou copiar o link também salva a visita, se ela ainda não foi salva.</div>
     <div class="field">
-      <span class="lbl">QR code do mesmo link (alternativa à NFC)</span>
+      <span class="lbl">QR code da página do cliente (alternativa à NFC)</span>
       <div class="qr" id="qr"></div>
     </div>
   </section>
@@ -147,34 +151,60 @@ function capitalizar(nome) {
     .replace(/ (Da|De|Do|Das|Dos|E) /g, m => m.toLowerCase());
 }
 
-// Nome do cliente: o que vem depois de "Cliente:" (ou "Proprietário:", "Nome:") até o próximo campo da linha.
+// Nome do cliente: o que vem depois de "Cliente", "Nome", "Razão social" ou "Proprietário" até o próximo
+// campo da linha. Se o rótulo estiver sozinho na linha, o nome é a linha seguinte.
+const ROTULOS_NOME = ["nome do cliente", "nome\\s*/\\s*raz[aã]o social", "raz[aã]o social", "cliente", "propriet[aá]rio", "nome"];
+const FIM_NOME = /\s{2,}|\s*\||\s+(?:cpf|cnpj|cpf\/cnpj|rg|ie|tel|telefone|fone|celular|cel|whats\w*|e-?mail|placa|ve[ií]culo|modelo|data|endere[cç]o|c[oó]d\w*|cidade|bairro|cep)\b/i;
+
+function limparNome(v) {
+  let nome = v.replace(/^[\s:–-]+/, "").split(FIM_NOME)[0].replace(/^[\s:–-]+/, "").replace(/^\d+\s*[-–]\s*/, "").replace(/[\s,;:.-]+$/, "").trim();
+  // Outro rótulo ("Nome: …") ou número não é nome; o nome da oficina também não.
+  if (/:/.test(nome) || !/[A-Za-zÀ-ú]{2}/.test(nome) || /\d{3}/.test(nome)) return "";
+  if (nome.toUpperCase().includes(CFG.oficina.nome.toUpperCase())) return "";
+  return capitalizar(nome).slice(0, 120);
+}
+
 function lerNome(texto) {
-  for (const rotulo of ["cliente", "propriet[aá]rio", "nome do cliente", "nome"]) {
-    const m = texto.match(new RegExp("(?:^|[\\s|])" + rotulo + "\\s*:\\s*([^\\n]+)", "i"));
-    if (!m) continue;
-    const nome = m[1].split(/\s{2,}|\s+(?:cpf|cnpj|rg|tel|telefone|fone|celular|cel|whats\w*|e-?mail|placa|ve[ií]culo|data|endere[cç]o|c[oó]d)\b/i)[0]
-      .replace(/^\d+\s*[-–]\s*/, "").replace(/[\s,;:.-]+$/, "").trim();
-    if (/[A-Za-zÀ-ú]{2}/.test(nome)) return capitalizar(nome).slice(0, 120);
+  const linhas = texto.split("\n");
+  for (const rotulo of ROTULOS_NOME) {
+    const re = new RegExp("(?:^|[\\s|])" + rotulo + "\\s*(?::|\\s-\\s|\\s{2,}|$)(.*)", "i");
+    for (let i = 0; i < linhas.length; i++) {
+      const m = linhas[i].match(re);
+      if (!m) continue;
+      const nome = limparNome(m[1].trim() ? m[1] : linhas[i + 1] || "");
+      if (nome) return nome;
+    }
   }
   return "";
 }
 
 // Telefone do cliente: primeiro o que tem rótulo (Telefone, Celular…), depois qualquer número; nunca o da oficina.
+// Aceita (67) 99123-4567, 67 9 9123 4567, 67-99123-4567, 67991234567 e +55 na frente.
+const FONE = "\\(?\\d{2}\\)?[\\s.-]*9?[\\s.]?\\d{4}[\\s.-]?\\d{4}";
 function lerTelefone(t) {
-  const fone = "\\(?\\d{2}\\)?\\s*9?\\s?\\d{4}[\\s.-]?\\d{4}";
   const daOficina = String(CFG.oficina.whatsapp).replace(/^55/, "");
   const candidatos = [
-    ...t.matchAll(new RegExp("(?:TELEFONE|TEL|FONE|CELULAR|CEL|WHATSAPP|CONTATO)\\.?\\s*:?\\s*(?:\\+?55\\s*)?(" + fone + ")", "g")),
-    ...t.matchAll(new RegExp("(?<![\\d/])(" + fone + ")(?![\\d/])", "g"))
+    ...t.matchAll(new RegExp("(?:TELEFONE|TEL|FONE|CELULAR|CEL|WHATSAPP|WHATS|CONTATO)\\.?\\s*(?:\\d\\s*)?[:/-]?\\s*(?:\\+?55\\s*)?(" + FONE + ")", "g")),
+    ...t.matchAll(new RegExp("(?<![\\d/.,-])(?:\\+?55\\s*)?(" + FONE + ")(?![\\d/.,])", "g"))
   ].map(m => m[1].replace(/\D/g, ""));
-  return candidatos.find(d => (d.length === 10 || d.length === 11) && d !== daOficina) || "";
+  const validos = candidatos.filter(d => (d.length === 10 || d.length === 11) && d !== daOficina && +d.slice(0, 2) >= 11);
+  // Celular (11 dígitos) primeiro: é o que tem WhatsApp.
+  return validos.find(d => d.length === 11) || validos[0] || "";
+}
+
+// Placa: primeiro a que vem depois de "Placa", depois qualquer placa no texto (antiga ABC-1234 ou Mercosul ABC1D23).
+function lerPlaca(t) {
+  const placa = "[A-Z]{3}[-\\s]?[0-9][A-Z0-9][0-9]{2}";
+  const m = t.match(new RegExp("PLACA[^\\n:]{0,20}:?\\s*(" + placa + ")(?![A-Z0-9])")) ||
+    t.match(new RegExp("(?<![A-Z0-9])(" + placa + ")(?![A-Z0-9])"));
+  return m ? U.placa(m[1]) : "";
 }
 
 // Lê o texto da OS (colado ou do PDF): placa, cliente, telefone, km, data e serviços pelos trechos "os" do config.js.
 function lerOS(texto) {
   const t = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-  const mp = t.match(/PLACA\s*:?\s*([A-Z]{3}-?\d[A-Z0-9]\d{2})/);
-  if (mp) $("placa").value = U.placa(mp[1]);
+  const placa = lerPlaca(t);
+  if (placa) $("placa").value = placa;
   const nome = lerNome(texto), tel = lerTelefone(t);
   if (nome) $("nome").value = nome;
   if (tel) $("telefone").value = fmtFone(tel);
@@ -192,12 +222,12 @@ function lerOS(texto) {
     if (!cb.checked) { cb.checked = true; marcar(cb); }
   }
   preencherFeitos();
-  $("osMsg").textContent = (mp ? "Placa " + U.placa(mp[1]) + ". " : "Placa não encontrada. ") +
+  $("osMsg").textContent = (placa ? "Placa " + placa + ". " : "Placa não encontrada. ") +
     (nome ? "Cliente " + nome + ". " : "") + (tel ? "Telefone " + fmtFone(tel) + ". " : "") +
     (dOS && dOS <= new Date() ? "Data " + md[1] + ". " : "") +
     (achados.length ? "Marcados: " + achados.join(", ") + "." : "Nenhum serviço da etiqueta encontrado.") +
     ($("visitaKm").value ? "" : " Falta o km de hoje.");
-  if (mp) buscarNoSistema();
+  if (placa) buscarNoSistema();
 }
 
 // PDF da OS: o texto é extraído no próprio navegador (pdf.js) e passa pelo mesmo leitor do texto colado.
@@ -384,7 +414,7 @@ async function salvar(origem) {
       pdfSalvo = chavePdf;
     }
     if (pdf) txtPdf = ", PDF da OS";
-    if (!leitura) { salvoAgora = true; $("placaMsg").textContent = ""; }
+    if (!leitura) { salvoAgora = true; $("placaMsg").textContent = ""; qrCelular(placa); }
     $("salvo").textContent = "Salvo no sistema: placa " + placa + ", " + servicos.length + (servicos.length === 1 ? " serviço" : " serviços") +
       (nome || telefone ? ", cliente" : "") + txtPdf + ". A etiqueta pode ser gravada agora ou depois pela tela de frota.";
   } catch (e) {
@@ -461,11 +491,26 @@ $("linkCliente").href = CFG.paginaCliente;
 OFICINA.menu();
 if (!nfc) $("btnGravar").textContent = "Gravar na etiqueta NFC (só Chrome Android)";
 atualizar();
-// Vindo da tela de frota (?placa=…): carrega o carro do sistema; "#etiqueta" vai direto para a gravação.
-const placaUrl = U.placa(new URLSearchParams(location.search).get("placa"));
+// QR code para abrir esta placa no celular, direto na gravação (os dados vêm do sistema, então precisa estar salvo).
+function qrCelular(placa) {
+  const url = location.origin + location.pathname + "?placa=" + placa + "&etiqueta=1";
+  const q = $("qrCelular"); q.replaceChildren();
+  if (window.QRCode) new QRCode(q, { text: url, width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
+  else q.textContent = "O QR code precisa de internet para aparecer.";
+  $("celularMsg").textContent = "Placa " + placa + ".";
+  // No celular com NFC não precisa do QR.
+  $("celular").hidden = nfc;
+}
+
+// Vindo da tela de frota ou do QR (?placa=…): carrega o carro do sistema; "etiqueta=1" vai direto para a gravação.
+const params = new URLSearchParams(location.search);
+const placaUrl = U.placa(params.get("placa"));
 if (placaUrl) {
   $("placa").value = placaUrl;
-  buscarNoSistema().then(() => { if (location.hash === "#etiqueta") $("etiqueta").scrollIntoView(); });
+  buscarNoSistema().then(() => {
+    if (placaBuscada === placaUrl && $("placaMsg").textContent.startsWith("Placa já")) qrCelular(placaUrl);
+    if (params.get("etiqueta") || location.hash === "#etiqueta") $("etiqueta").scrollIntoView();
+  });
 }
 </script>
 </body>

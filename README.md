@@ -119,7 +119,12 @@ estão no sistema. O mesmo serviço na mesma placa e no mesmo dia não duplica.
 - **Leitura do PDF**: se o PDF tiver texto (não for imagem escaneada), o navegador extrai o
   texto com pdf.js e preenche placa, cliente (`Cliente:`, `Proprietário:` ou `Nome:`), telefone
   (`Telefone`, `Celular`, `Fone`… ou o primeiro número que não seja o da oficina), km, data da
-  OS e serviços, igual ao texto colado. Os campos podem ser corrigidos antes de salvar.
+  OS e serviços, igual ao texto colado. Os campos podem ser corrigidos antes de salvar. A placa
+  vem depois de "Placa" ou, se não tiver rótulo, é a primeira no formato `ABC-1234`/`ABC1D23`.
+- **Gravar pelo celular**: no computador não dá para gravar NFC. Depois de salvar, a tela mostra
+  um QR code (e a frota tem o botão "QR para gravar pelo celular") que abre a mesma placa no
+  celular, com os dados do sistema, direto na gravação. Se o celular não estiver logado, o login
+  volta para a placa.
 
 Na página do cliente, o km que ele digita em "Quilometragem atual" é enviado ao backend
 (`envioKm` no `config.js`) uns segundos depois que ele para de digitar, só se for maior que o

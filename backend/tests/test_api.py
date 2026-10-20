@@ -10,6 +10,9 @@ def test_sem_login_nao_ve_nada(cliente):
     r = cliente.get("/oficina/frota.html", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/oficina/entrar.html?volta=frota.html"
     assert cliente.get("/oficina/gravar.html", follow_redirects=False).status_code == 303
+    # O QR do celular traz a placa; depois do login volta para ela.
+    r = cliente.get("/oficina/gravar.html?placa=LMV4G22&etiqueta=1", follow_redirects=False)
+    assert r.headers["location"] == "/oficina/entrar.html?volta=gravar.html%3Fplaca%3DLMV4G22%26etiqueta%3D1"
 
 
 def test_login_e_paginas_publicas(cliente):

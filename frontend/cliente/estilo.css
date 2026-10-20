@@ -138,6 +138,9 @@ h1 { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.05; text-wra
 .msg.ok { background: var(--ok-bg); color: var(--ok); } .msg.warn { background: var(--warn-bg); color: var(--warn); } .msg.bad { background: var(--bad-bg); color: var(--bad); }
 .qr { justify-self: start; background: #fff; padding: 10px; border-radius: 10px; }
 .qr img, .qr canvas { display: block; width: 168px; height: 168px; }
+.celular { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; border: 1px dashed var(--line); border-radius: 12px; padding: 12px; }
+.celular .small { flex: 1 1 200px; }
+.celular[hidden] { display: none; }
 
 /* Área da oficina (login, frota) */
 .wrap.largo { max-width: 1180px; }

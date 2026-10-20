@@ -7,6 +7,7 @@ import json
 import re
 import time
 from contextlib import asynccontextmanager
+from urllib.parse import urlencode
 from datetime import date
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request, Response
@@ -296,12 +297,14 @@ def oficina_inicio():
 
 
 @app.get("/oficina/{arquivo}")
-def oficina(arquivo: str, pantanal_sessao: str | None = Cookie(None)):
+def oficina(arquivo: str, req: Request, pantanal_sessao: str | None = Cookie(None)):
     caminho = (OFICINA / arquivo).resolve()
     if caminho.parent != OFICINA.resolve() or not caminho.is_file():
         raise HTTPException(404)
     if caminho.suffix == ".html" and arquivo != "entrar.html" and not seguranca.usuario_da_sessao(pantanal_sessao):
-        return RedirectResponse("/oficina/entrar.html?volta=" + arquivo, 303)
+        # Depois do login volta para a mesma página, com os parâmetros (o QR do celular traz ?placa=…).
+        volta = arquivo + ("?" + req.url.query if req.url.query else "")
+        return RedirectResponse("/oficina/entrar.html?" + urlencode({"volta": volta}), 303)
     return FileResponse(caminho, headers={"Cache-Control": "no-store"} if caminho.suffix == ".html" else None)
 
 

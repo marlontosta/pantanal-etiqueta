@@ -8,7 +8,7 @@ window.OFICINA = {
       headers: { "Content-Type": "application/json", ...(opcoes.headers || {}) }
     });
     if (r.status === 401 && !url.endsWith("/entrar")) {
-      location.href = "entrar.html?volta=" + encodeURIComponent(location.pathname.split("/").pop());
+      location.href = "entrar.html?volta=" + encodeURIComponent(location.pathname.split("/").pop() + location.search);
       throw new Error("sessão expirada");
     }
     const dados = await r.json().catch(() => ({}));
