@@ -1,0 +1,927 @@
+From 3f535ebb7df99a64b1d6c9583d989fd6016a409c Mon Sep 17 00:00:00 2001
+From: Marlon <marlon.tosta@outlook.com>
+Date: Tue, 20 Oct 2026 18:26:24 +0000
+Subject: [PATCH] Registrar visita com cliente e PDF da OS, sem depender da
+ etiqueta
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A tela de gravar vira "Registrar visita": salvar no sistema é um botão
+próprio e a etiqueta é opcional (agora ou depois, pela tela de frota).
+Guarda nome e telefone do cliente por placa e o PDF da OS ao lado do
+banco. Se o PDF tiver texto, preenche placa, cliente, telefone, km, data
+e serviços. A frota mostra o cliente, abre os PDFs e tem o botão
+"Gravar etiqueta com estes dados".
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XSPCZ6MKf4qnRkxj9Er8pG
+---
+ README.md                    |  35 ++++--
+ backend/app/config.py        |   3 +
+ backend/app/db.py            |  23 +++-
+ backend/app/main.py          | 112 +++++++++++++++--
+ backend/tests/conftest.py    |   1 +
+ backend/tests/test_visita.py |  65 ++++++++++
+ frontend/cliente/estilo.css  |   4 +
+ frontend/oficina/frota.html  |  52 ++++++--
+ frontend/oficina/gravar.html | 227 +++++++++++++++++++++++++++++++----
+ 9 files changed, 475 insertions(+), 47 deletions(-)
+ create mode 100644 backend/tests/test_visita.py
+
+diff --git a/README.md b/README.md
+index 3e4954b..fb469e4 100644
+--- a/README.md
++++ b/README.md
+@@ -20,7 +20,7 @@ etiqueta/
+ │   └── oficina/         ← área da oficina, servida pelo backend, exige login
+ │       ├── entrar.html  login
+ │       ├── frota.html   veículos por placa: km atual, km/dia, próxima manutenção
+-│       ├── gravar.html  lê, monta e grava o link na etiqueta; salva a visita
++│       ├── gravar.html  registra a visita (cliente, serviços, PDF da OS) e grava a etiqueta
+ │       └── oficina.js   chamadas à API e menu
+ ├── backend/             ← API em Python (FastAPI + SQLite)
+ │   ├── app/
+@@ -87,6 +87,7 @@ Testes: `pip install -r requirements-dev.txt && python -m pytest`.
+ | `PANTANAL_BANCO`          | `backend/dados/pantanal.db`  | arquivo do banco; precisa ficar num disco que não se apaga |
+ | `PANTANAL_COOKIE_SEGURO`  | `1`                          | cookie só por https                               |
+ | `PANTANAL_SESSAO_DIAS`    | `30`                         | quantos dias o login dura                         |
++| `PANTANAL_ARQUIVOS_OS`    | pasta `os` ao lado do banco  | onde ficam os PDFs das OS                         |
+ | `PANTANAL_USUARIO` / `PANTANAL_SENHA` | –                | cria esse usuário na primeira vez, se o banco não tiver nenhum (para hospedagens sem terminal) |
+ 
+ ### Usuários
+@@ -103,10 +104,22 @@ usuário até a janela passar.
+ 
+ ### O que é salvo
+ 
+-Ao gravar a etiqueta, copiar o link ou clicar em "Só salvar no sistema", a tela de gravar envia
+-ao backend todos os serviços que estão na tela (placa, serviço, km e data). Ler uma etiqueta
+-também salva o que ela tem, para carros que ainda não estão no sistema. O mesmo serviço na
+-mesma placa e no mesmo dia não duplica.
++A tela "Registrar visita" (`gravar.html`) salva a visita com o botão "Salvar visita no sistema",
++sem depender da etiqueta: placa, nome e telefone do cliente, todos os serviços que estão na tela
++(serviço, km e data) e o PDF da OS. Gravar a etiqueta ou copiar o link também salva, se a visita
++ainda não foi salva. Ler uma etiqueta salva os serviços que ela tem, para carros que ainda não
++estão no sistema. O mesmo serviço na mesma placa e no mesmo dia não duplica.
++
++- **Cliente**: um nome e um telefone por placa (tabela `clientes`); vale o último informado, e
++  campo vazio não apaga o que já estava salvo. Ao digitar uma placa que já está no sistema, a
++  tela completa cliente, telefone e, se ainda estiverem em branco, os últimos serviços.
++- **PDF da OS**: até 10 MB, guardado na pasta `PANTANAL_ARQUIVOS_OS` (por padrão
++  `backend/dados/os/`, no mesmo disco do banco) com o nome igual ao hash do conteúdo; o mesmo
++  PDF de novo não duplica. Na tela de frota, o detalhe da placa lista as OS e abre o PDF.
++- **Leitura do PDF**: se o PDF tiver texto (não for imagem escaneada), o navegador extrai o
++  texto com pdf.js e preenche placa, cliente (`Cliente:`, `Proprietário:` ou `Nome:`), telefone
++  (`Telefone`, `Celular`, `Fone`… ou o primeiro número que não seja o da oficina), km, data da
++  OS e serviços, igual ao texto colado. Os campos podem ser corrigidos antes de salvar.
+ 
+ Na página do cliente, o km que ele digita em "Quilometragem atual" é enviado ao backend
+ (`envioKm` no `config.js`) uns segundos depois que ele para de digitar, só se for maior que o
+@@ -120,8 +133,10 @@ uma visita posterior ou se exigir mais de 1.500 km por dia; e cada endereço IP
+ 
+ Uma linha por placa, com última visita, km na visita, km/dia, km atual, próxima manutenção,
+ previsão, dias e km que faltam e situação. Clique em qualquer coluna para ordenar (de novo
+-inverte). Filtros: placa, situação, serviço, prazo da previsão e data da última visita. Clicar
+-numa linha mostra todos os serviços do carro e o histórico de visitas.
++inverte). Filtros: placa ou nome do cliente, situação, serviço, prazo da previsão e data da última
++visita. Clicar numa linha mostra cliente e telefone (link para o WhatsApp), todos os serviços do
++carro, o histórico de visitas, os PDFs das OS e os botões "Gravar etiqueta com estes dados" (abre
++a tela de visita com o carro carregado, direto na gravação) e "Registrar nova visita".
+ 
+ - **Km/dia**: (último km conhecido − primeiro) ÷ dias entre eles, contando as visitas e o km
+   digitado pelo cliente. Precisa de pelo menos dois dias com km e 7 dias entre eles; km que
+@@ -140,14 +155,16 @@ numa linha mostra todos os serviços do carro e o histórico de visitas.
+ | `POST /api/entrar`         | `{usuario, senha}` → cookie de sessão      |
+ | `POST /api/sair`           | encerra a sessão                           |
+ | `GET /api/eu`              | usuário logado                             |
+-| `POST /api/registros`      | `{placa, servicos: [{servico, km, data}]}` |
++| `POST /api/registros`      | `{placa, nome?, telefone?, servicos: [{servico, km, data}]}` |
++| `POST /api/ordens?placa=&data=&km=&nome=` | corpo = o PDF da OS (`application/pdf`) |
++| `GET /api/ordens/{id}`     | abre o PDF de uma OS                        |
+ | `POST /api/leituras`       | `{placa, km}` do cliente, sem login         |
+ | `GET /api/frota`           | resumo de todas as placas                  |
+ | `GET /api/veiculos/{placa}`| resumo e histórico de uma placa            |
+ 
+ ## Montar o link a partir da OS
+ 
+-Em `frontend/oficina/gravar.html`, cole no campo "Colar itens da OS" a placa, o km e os itens da ordem de serviço.
++Em `frontend/oficina/gravar.html`, escolha o PDF da OS ou cole no campo "Colar itens da OS" a placa, o km e os itens da ordem de serviço.
+ A página reconhece `Placa: LMV4G22`, `KM do serviço: 95178` e marca como feitos hoje os
+ serviços cujas descrições contêm os trechos do campo `os` de cada serviço no `config.js`
+ (`TROCA DE OLEO`; `REVISAO`, `SUSPENS`, `FREIO`, `AMORTECEDOR`, `BIELETA`, `TERMINAL`, `BANDEJA`, `PASTILHA` ou `AXIAL`; `ALINHAMENTO`, `BALANCEAMENTO` ou `GEOMETRIA`; `HIGIENIZ`). Os demais itens da OS são ignorados.
+diff --git a/backend/app/config.py b/backend/app/config.py
+index aca51eb..b6c0e12 100644
+--- a/backend/app/config.py
++++ b/backend/app/config.py
+@@ -8,6 +8,9 @@ FRONTEND = RAIZ / "frontend"
+ 
+ # Banco SQLite. Em hospedagem, aponte para um disco que não se apaga a cada deploy.
+ BANCO = pathlib.Path(os.environ.get("PANTANAL_BANCO", RAIZ / "backend" / "dados" / "pantanal.db"))
++# PDFs das ordens de serviço: por padrão numa pasta "os" ao lado do banco, no mesmo disco.
++ARQUIVOS_OS = pathlib.Path(os.environ.get("PANTANAL_ARQUIVOS_OS", BANCO.parent / "os"))
++OS_TAMANHO_MAXIMO = 10 * 1024 * 1024
+ # Cookie só por https em produção; em http local precisa ser 0.
+ COOKIE_SEGURO = os.environ.get("PANTANAL_COOKIE_SEGURO", "1") != "0"
+ SESSAO_DIAS = int(os.environ.get("PANTANAL_SESSAO_DIAS", "30"))
+diff --git a/backend/app/db.py b/backend/app/db.py
+index 759f494..3a36bbe 100644
+--- a/backend/app/db.py
++++ b/backend/app/db.py
+@@ -1,4 +1,4 @@
+-"""Banco SQLite: usuários, sessões, registros de serviço e km informados pelos clientes."""
++"""Banco SQLite: usuários, sessões, registros de serviço, clientes, ordens de serviço e km informados pelos clientes."""
+ import sqlite3
+ from contextlib import contextmanager
+ 
+@@ -38,6 +38,27 @@ CREATE TABLE IF NOT EXISTS leituras_cliente (
+   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+   UNIQUE (placa, data)
+ );
++-- Nome e telefone do dono de cada placa. Vale o último informado na tela de visita.
++CREATE TABLE IF NOT EXISTS clientes (
++  placa TEXT PRIMARY KEY,
++  nome TEXT NOT NULL DEFAULT '',
++  telefone TEXT NOT NULL DEFAULT '',
++  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
++);
++-- PDF da OS de uma visita. O arquivo fica em config.ARQUIVOS_OS com o nome igual ao sha256 do conteúdo.
++CREATE TABLE IF NOT EXISTS ordens (
++  id INTEGER PRIMARY KEY,
++  placa TEXT NOT NULL,
++  data TEXT NOT NULL,
++  km INTEGER,
++  arquivo TEXT NOT NULL,
++  nome_arquivo TEXT NOT NULL DEFAULT '',
++  tamanho INTEGER NOT NULL,
++  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
++  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
++  UNIQUE (placa, arquivo)
++);
++CREATE INDEX IF NOT EXISTS ordens_placa ON ordens (placa, data);
+ """
+ 
+ 
+diff --git a/backend/app/main.py b/backend/app/main.py
+index 522f371..ff6b9a7 100644
+--- a/backend/app/main.py
++++ b/backend/app/main.py
+@@ -2,13 +2,14 @@
+ 
+ Rodar: uvicorn app.main:app --reload  (dentro de backend/)
+ """
++import hashlib
+ import json
+ import re
+ import time
+ from contextlib import asynccontextmanager
+ from datetime import date
+ 
+-from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response
++from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request, Response
+ from fastapi.responses import FileResponse, RedirectResponse
+ from fastapi.staticfiles import StaticFiles
+ from pydantic import BaseModel, Field, ValidationError, field_validator
+@@ -73,7 +74,7 @@ def eu(u=Depends(usuario_logado)):
+     return {"usuario": u["usuario"], "nome": u["nome"]}
+ 
+ 
+-# Registros de serviço (enviados pela tela de gravar etiqueta)
++# Visita: registros de serviço e dados do cliente (enviados pela tela de registrar visita)
+ 
+ def placa_valida(v: str) -> str:
+     v = re.sub(r"[^A-Z0-9]", "", v.upper())
+@@ -82,6 +83,16 @@ def placa_valida(v: str) -> str:
+     return v
+ 
+ 
++def telefone_valido(v: str) -> str:
++    """Só os dígitos, sem o 55 do Brasil. Vazio é aceito (cliente sem telefone)."""
++    d = re.sub(r"\D", "", v)
++    if len(d) in (12, 13) and d.startswith("55"):
++        d = d[2:]
++    if d and len(d) not in (10, 11):
++        raise ValueError("telefone inválido: use DDD e número")
++    return d
++
++
+ class Servico(BaseModel):
+     servico: str
+     km: int | None = Field(None, ge=0, le=9_999_999)
+@@ -98,25 +109,90 @@ class Servico(BaseModel):
+ class Visita(BaseModel):
+     placa: str
+     servicos: list[Servico] = Field(max_length=20)
++    # None não mexe no que já está salvo; texto vazio também não apaga.
++    nome: str | None = Field(None, max_length=120)
++    telefone: str | None = Field(None, max_length=30)
+ 
+     _placa = field_validator("placa")(placa_valida)
++    _telefone = field_validator("telefone")(lambda v: None if v is None else telefone_valido(v))
++
++    @field_validator("nome")
++    @classmethod
++    def nome_limpo(cls, v: str | None) -> str | None:
++        return None if v is None else " ".join(v.split())
+ 
+ 
+ @app.post("/api/registros")
+ def salvar_registros(visita: Visita, u=Depends(usuario_logado)):
+-    """Guarda o que está na etiqueta. Serviço já salvo no mesmo dia só atualiza o km."""
++    """Guarda a visita: serviços (repetir no mesmo dia só atualiza o km) e nome e telefone do cliente."""
+     with db.transacao() as con:
+         for s in visita.servicos:
+             if s.data > config.hoje():
+                 raise HTTPException(422, "Data no futuro: " + s.data.strftime("%d/%m/%Y"))
+-            cur = con.execute(
++            con.execute(
+                 "INSERT INTO registros (placa, servico, km, data, usuario_id) VALUES (?, ?, ?, ?, ?)"
+                 " ON CONFLICT (placa, servico, data) DO UPDATE SET km = COALESCE(excluded.km, km)",
+                 (visita.placa, s.servico, s.km, s.data.isoformat(), u["id"]),
+             )
++        if visita.nome or visita.telefone:
++            con.execute(
++                "INSERT INTO clientes (placa, nome, telefone) VALUES (?, ?, ?) ON CONFLICT (placa) DO UPDATE SET"
++                " nome = CASE WHEN excluded.nome = '' THEN nome ELSE excluded.nome END,"
++                " telefone = CASE WHEN excluded.telefone = '' THEN telefone ELSE excluded.telefone END,"
++                " atualizado_em = datetime('now')",
++                (visita.placa, visita.nome or "", visita.telefone or ""),
++            )
+     return {"placa": visita.placa, "recebidos": len(visita.servicos)}
+ 
+ 
++# PDF da OS: o corpo da requisição é o próprio arquivo (sem formulário multipart).
++
++@app.post("/api/ordens")
++async def salvar_os(req: Request, placa: str, data: date, km: int | None = Query(None, ge=0, le=9_999_999),
++                    nome: str = Query("", max_length=200), u=Depends(usuario_logado)):
++    try:
++        placa = placa_valida(placa)
++    except ValueError:
++        raise HTTPException(422, "Placa inválida.")
++    if data > config.hoje():
++        raise HTTPException(422, "Data no futuro: " + data.strftime("%d/%m/%Y"))
++    if int(req.headers.get("content-length") or 0) > config.OS_TAMANHO_MAXIMO:
++        raise HTTPException(413, "PDF maior que 10 MB.")
++    conteudo = await req.body()
++    if len(conteudo) > config.OS_TAMANHO_MAXIMO:
++        raise HTTPException(413, "PDF maior que 10 MB.")
++    if not conteudo.startswith(b"%PDF-"):
++        raise HTTPException(422, "O arquivo não é um PDF.")
++    arquivo = hashlib.sha256(conteudo).hexdigest() + ".pdf"
++    config.ARQUIVOS_OS.mkdir(parents=True, exist_ok=True)
++    destino = config.ARQUIVOS_OS / arquivo
++    if not destino.exists():
++        temp = destino.with_suffix(".tmp")
++        temp.write_bytes(conteudo)
++        temp.replace(destino)
++    # O mesmo PDF de novo na mesma placa só atualiza a data e o km.
++    with db.transacao() as con:
++        con.execute(
++            "INSERT INTO ordens (placa, data, km, arquivo, nome_arquivo, tamanho, usuario_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
++            " ON CONFLICT (placa, arquivo) DO UPDATE SET data = excluded.data, km = COALESCE(excluded.km, km)",
++            (placa, data.isoformat(), km, arquivo, nome.strip()[:200], len(conteudo), u["id"]),
++        )
++        id_ = con.execute("SELECT id FROM ordens WHERE placa = ? AND arquivo = ?", (placa, arquivo)).fetchone()["id"]
++    return {"id": id_, "placa": placa}
++
++
++@app.get("/api/ordens/{id_}")
++def ver_os(id_: int, u=Depends(usuario_logado)):
++    with db.transacao() as con:
++        o = con.execute("SELECT * FROM ordens WHERE id = ?", (id_,)).fetchone()
++    caminho = config.ARQUIVOS_OS / o["arquivo"] if o else None
++    if caminho is None or not caminho.is_file():
++        raise HTTPException(404, "OS não encontrada.")
++    nome = "OS " + o["placa"] + " " + o["data"] + ".pdf"
++    return FileResponse(caminho, media_type="application/pdf", filename=nome, content_disposition_type="inline",
++                        headers={"Cache-Control": "private, max-age=86400"})
++
++
+ # Km que o cliente digita na página da etiqueta. Público: a página do cliente não tem login.
+ # Vem também da página antiga no GitHub Pages, que manda sem CORS (texto puro, sem ler a resposta).
+ 
+@@ -175,20 +251,40 @@ def _leituras(placa: str | None = None) -> list[dict]:
+         return [dict(r) for r in con.execute(sql + " ORDER BY placa, data", args)]
+ 
+ 
++def _clientes() -> dict[str, dict]:
++    with db.transacao() as con:
++        return {r["placa"]: {"nome": r["nome"], "telefone": r["telefone"]}
++                for r in con.execute("SELECT placa, nome, telefone FROM clientes")}
++
++
++def _ordens(placa: str) -> list[dict]:
++    with db.transacao() as con:
++        return [dict(r) for r in con.execute(
++            "SELECT id, data, km, nome_arquivo, tamanho FROM ordens WHERE placa = ? ORDER BY data DESC, id DESC", (placa,))]
++
++
++SEM_CLIENTE = {"nome": "", "telefone": ""}
++
++
+ @app.get("/api/frota")
+ def ver_frota(u=Depends(usuario_logado)):
++    clientes = _clientes()
++    veiculos = frota.resumo_frota(_registros(), config.hoje(), _leituras())
+     return {"hoje": config.hoje().isoformat(), "servicos": config.SERVICOS,
+-            "veiculos": frota.resumo_frota(_registros(), config.hoje(), _leituras())}
++            "veiculos": [{**v, "cliente": clientes.get(v["placa"], SEM_CLIENTE)} for v in veiculos]}
+ 
+ 
+ @app.get("/api/veiculos/{placa}")
+ def ver_veiculo(placa: str, u=Depends(usuario_logado)):
+     placa = re.sub(r"[^A-Z0-9]", "", placa.upper())
+-    regs = _registros(placa)
+-    if not regs:
++    regs, ordens = _registros(placa), _ordens(placa)
++    cliente = _clientes().get(placa)
++    if not regs and not ordens and not cliente:
+         raise HTTPException(404, "Placa sem registros.")
+     leituras = _leituras(placa)
+-    return {**frota.resumo_veiculo(placa, regs, config.hoje(), leituras), "historico": regs[::-1],
++    # Placa só com cliente ou OS (visita salva sem serviço marcado): ainda não tem resumo.
++    resumo = frota.resumo_veiculo(placa, regs, config.hoje(), leituras) if regs else {"placa": placa, "servicos": []}
++    return {**resumo, "cliente": cliente or SEM_CLIENTE, "ordens": ordens, "historico": regs[::-1],
+             "leituras": frota.leituras_validas(regs, leituras)[::-1]}
+ 
+ 
+diff --git a/backend/tests/conftest.py b/backend/tests/conftest.py
+index bfc9a46..e035b02 100644
+--- a/backend/tests/conftest.py
++++ b/backend/tests/conftest.py
+@@ -7,6 +7,7 @@ from app import config, db, main, seguranca
+ @pytest.fixture
+ def cliente(tmp_path, monkeypatch):
+     monkeypatch.setattr(config, "BANCO", tmp_path / "teste.db")
++    monkeypatch.setattr(config, "ARQUIVOS_OS", tmp_path / "os")
+     monkeypatch.setattr(config, "COOKIE_SEGURO", False)
+     seguranca._falhas.clear()
+     main._envios.clear()
+diff --git a/backend/tests/test_visita.py b/backend/tests/test_visita.py
+new file mode 100644
+index 0000000..7b55733
+--- /dev/null
++++ b/backend/tests/test_visita.py
+@@ -0,0 +1,65 @@
++from datetime import timedelta
++
++from app import config
++
++PDF = b"%PDF-1.4\n% OS de teste\n%%EOF\n"
++
++
++def test_cliente_e_visita_sem_etiqueta(logado):
++    hoje = config.hoje().isoformat()
++    r = logado.post("/api/registros", json={"placa": "LMV4G22", "nome": "  João   da Silva ", "telefone": "+55 (67) 99123-4567",
++                                             "servicos": [{"servico": "oleo", "km": 95000, "data": hoje}]})
++    assert r.status_code == 200
++    carro = logado.get("/api/frota").json()["veiculos"][0]
++    assert carro["cliente"] == {"nome": "João da Silva", "telefone": "67991234567"}
++    # Sem nome e telefone (por exemplo, ao ler uma etiqueta) não apaga o que já está salvo.
++    logado.post("/api/registros", json={"placa": "LMV4G22", "servicos": [{"servico": "geo", "km": 95000, "data": hoje}]})
++    logado.post("/api/registros", json={"placa": "LMV4G22", "nome": "", "telefone": "", "servicos": []})
++    assert logado.get("/api/veiculos/LMV4G22").json()["cliente"]["nome"] == "João da Silva"
++    logado.post("/api/registros", json={"placa": "LMV4G22", "telefone": "67 3321-0000", "servicos": []})
++    assert logado.get("/api/veiculos/LMV4G22").json()["cliente"] == {"nome": "João da Silva", "telefone": "6733210000"}
++
++
++def test_telefone_invalido(logado):
++    r = logado.post("/api/registros", json={"placa": "LMV4G22", "telefone": "1234", "servicos": []})
++    assert r.status_code == 422
++
++
++def test_placa_so_com_cliente(logado):
++    assert logado.post("/api/registros", json={"placa": "QWE1R23", "nome": "Ana", "servicos": []}).status_code == 200
++    # Não entra na frota (não tem serviço), mas a tela de visita encontra o nome.
++    assert logado.get("/api/frota").json()["veiculos"] == []
++    d = logado.get("/api/veiculos/QWE1R23").json()
++    assert d["cliente"]["nome"] == "Ana" and d["servicos"] == [] and d["historico"] == []
++
++
++def test_pdf_da_os(logado):
++    hoje = config.hoje().isoformat()
++    envio = lambda corpo, **q: logado.post("/api/ordens", params={"placa": "lmv4g22", "data": hoje, **q},
++                                           content=corpo, headers={"content-type": "application/pdf"})
++    r = envio(PDF, km=95000, nome="OS 1234.pdf")
++    assert r.status_code == 200
++    id_ = r.json()["id"]
++    # O mesmo arquivo de novo não duplica.
++    assert envio(PDF).json()["id"] == id_
++    assert envio(b"nao sou pdf").status_code == 422
++    assert envio(PDF, placa="XX").status_code == 422
++    futuro = (config.hoje() + timedelta(days=3)).isoformat()
++    assert envio(PDF, data=futuro).status_code == 422
++    assert envio(b"%PDF-" + b"0" * config.OS_TAMANHO_MAXIMO).status_code == 413
++
++    arquivo = logado.get(f"/api/ordens/{id_}")
++    assert arquivo.status_code == 200 and arquivo.content == PDF
++    assert arquivo.headers["content-type"] == "application/pdf"
++    assert arquivo.headers["content-disposition"].startswith("inline")
++    assert len(list(config.ARQUIVOS_OS.iterdir())) == 1
++
++    d = logado.get("/api/veiculos/LMV4G22").json()
++    assert d["ordens"] == [{"id": id_, "data": hoje, "km": 95000, "nome_arquivo": "OS 1234.pdf", "tamanho": len(PDF)}]
++    assert logado.get("/api/ordens/999").status_code == 404
++
++
++def test_pdf_exige_login(cliente):
++    r = cliente.post("/api/ordens", params={"placa": "LMV4G22", "data": config.hoje().isoformat()}, content=PDF)
++    assert r.status_code == 401
++    assert cliente.get("/api/ordens/1").status_code == 401
+diff --git a/frontend/cliente/estilo.css b/frontend/cliente/estilo.css
+index 7de5f4a..379c82f 100644
+--- a/frontend/cliente/estilo.css
++++ b/frontend/cliente/estilo.css
+@@ -119,6 +119,7 @@ h1 { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.05; text-wra
+ .card h2 { margin: 0; font-family: var(--display); font-size: 1.35rem; font-weight: 600; }
+ .field { display: grid; gap: 4px; min-width: 0; }
+ .field label, .field .lbl { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
++.field input[type="file"] { font-size: .95rem; padding: 8px; }
+ .field input, .field textarea { font: 500 1.05rem var(--body); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-width: 0; width: 100%; }
+ .field textarea { font: .85rem/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; word-break: break-all; }
+ .field input:focus-visible, .field textarea:focus-visible { outline: 3px solid var(--brand); outline-offset: 1px; }
+@@ -168,6 +169,9 @@ h1 { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.05; text-wra
+ .tabela tbody tr.linha:hover { background: var(--bg); }
+ .tabela tbody tr.linha:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+ .tabela .placa-txt { font: 700 1.05rem var(--display); letter-spacing: .06em; }
++.tabela .cli-nome { display: block; font-size: .8rem; color: var(--muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
++.tabela tr.detalhe a:not(.b) { color: var(--accent); }
++.tabela tr.detalhe .actions { margin-top: 10px; }
+ .tabela .est { color: var(--muted); font-size: .8em; }
+ .tabela .est.cli { color: var(--accent); cursor: help; }
+ .tabela tr.detalhe td { white-space: normal; background: var(--bg); padding: 12px 14px; }
+diff --git a/frontend/oficina/frota.html b/frontend/oficina/frota.html
+index 8f1425a..f95131a 100644
+--- a/frontend/oficina/frota.html
++++ b/frontend/oficina/frota.html
+@@ -13,7 +13,7 @@
+     <img src="../logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
+     <nav class="menu" aria-label="Área da oficina">
+       <a href="frota.html">Frota</a>
+-      <a href="gravar.html">Gravar etiqueta</a>
++      <a href="gravar.html">Registrar visita</a>
+       <span class="quem"></span>
+       <button type="button" data-sair>Sair</button>
+     </nav>
+@@ -27,7 +27,7 @@
+ 
+   <section class="card" aria-label="Filtros">
+     <div class="filtros">
+-      <div class="field"><label for="fPlaca">Placa</label><input id="fPlaca" type="search" autocomplete="off" placeholder="ABC1D23" style="text-transform:uppercase"></div>
++      <div class="field"><label for="fPlaca">Placa ou cliente</label><input id="fPlaca" type="search" autocomplete="off" placeholder="ABC1D23 ou nome"></div>
+       <div class="field"><label for="fStatus">Situação</label>
+         <select id="fStatus"><option value="">Todas</option><option value="bad">Vencida</option><option value="warn">Próxima</option><option value="ok">Em dia</option></select></div>
+       <div class="field"><label for="fServico">Serviço</label><select id="fServico"><option value="">Mais urgente</option></select></div>
+@@ -68,7 +68,12 @@ const abertos = new Set();
+ 
+ // Linha da tabela: o carro e o serviço mostrado (o mais urgente, ou o filtrado).
+ const COLS = [
+-  { k: "placa", t: "Placa", v: x => x.v.placa, f: x => el("span", "placa-txt", x.v.placa) },
++  { k: "placa", t: "Placa", v: x => x.v.placa, f: x => {
++      const s = el("span", null);
++      s.append(el("span", "placa-txt", x.v.placa));
++      if (x.v.cliente.nome) s.append(el("span", "cli-nome", x.v.cliente.nome));
++      return s;
++    } },
+   { k: "visita", t: "Última visita", v: x => x.v.ultima_visita, f: x => fmtData(x.v.ultima_visita) },
+   { k: "kmvisita", t: "Km na visita", n: 1, v: x => x.v.ultimo_km, f: x => fmtKm(x.v.ultimo_km) },
+   { k: "kmdia", t: "Km/dia", n: 1, v: x => x.v.km_por_dia, f: x => x.v.km_por_dia == null ? "–" : x.v.km_por_dia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) },
+@@ -108,15 +113,17 @@ function montarCabecalho() {
+   }
+ }
+ 
++const semAcento = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
++
+ function linhasFiltradas() {
+-  const placa = $("fPlaca").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
++  const busca = semAcento($("fPlaca").value).trim(), placa = busca.replace(/[^A-Z0-9]/g, "");
+   const servico = $("fServico").value, prazo = $("fPrazo").value, visita = $("fVisita").value;
+   const hj = Date.parse(hoje);
+   const linhas = [];
+   for (const v of veiculos) {
+     const s = servico ? v.servicos.find(i => i.servico === servico) : v.proxima;
+     if (servico && !s) continue;
+-    if (placa && !v.placa.includes(placa)) continue;
++    if (busca && !(placa && v.placa.includes(placa)) && !semAcento(v.cliente.nome).includes(busca)) continue;
+     if (prazo !== "") {
+       // "Já vencida": dias negativos. "Nos próximos N dias": de hoje até N, sem as vencidas.
+       if (!s || (+prazo === 0 ? s.falta_dias >= 0 : s.falta_dias < 0 || s.falta_dias > +prazo)) continue;
+@@ -172,7 +179,7 @@ function render() {
+     if (abertos.has(x.v.placa)) corpo.append(detalhe(x.v));
+   }
+   if (!linhas.length) {
+-    const td = el("td", "vazio", veiculos.length ? "Nenhum veículo com esses filtros." : "Nenhum veículo registrado ainda. Os carros aparecem aqui quando a etiqueta é gravada ou lida na tela Gravar etiqueta.");
++    const td = el("td", "vazio", veiculos.length ? "Nenhum veículo com esses filtros." : "Nenhum veículo registrado ainda. Os carros aparecem aqui quando uma visita é salva (ou uma etiqueta é lida) na tela Registrar visita.");
+     td.colSpan = COLS.length;
+     corpo.append(el("tr"));
+     corpo.lastChild.append(td);
+@@ -197,10 +204,38 @@ function detalhe(v) {
+     tb.append(r);
+   }
+   t.append(tb);
+-  const hist = el("p", "small", "Carregando histórico…"), leit = el("p", "small");
+-  td.append(t, hist, leit);
++  const cli = el("p", "small"), hist = el("p", "small", "Carregando histórico…"), leit = el("p", "small"), oss = el("p", "small");
++  // Gravar a etiqueta (ou registrar nova visita) com os dados do sistema, na tela de visita.
++  const acoes = el("div", "actions");
++  const gravar = el("a", "b primary", "Gravar etiqueta com estes dados");
++  gravar.href = "gravar.html?placa=" + v.placa + "#etiqueta";
++  const nova = el("a", "b", "Registrar nova visita");
++  nova.href = "gravar.html?placa=" + v.placa;
++  acoes.append(gravar, nova);
++  td.append(cli, t, hist, oss, leit, acoes);
+   tr.append(td);
++  if (v.cliente.nome || v.cliente.telefone) {
++    cli.append("Cliente: " + (v.cliente.nome || "sem nome"));
++    if (v.cliente.telefone) {
++      const w = el("a", null, CFG_FONE(v.cliente.telefone));
++      w.href = "https://wa.me/55" + v.cliente.telefone;
++      w.target = "_blank"; w.rel = "noopener";
++      cli.append(" · ", w);
++    }
++  } else cli.textContent = "Cliente: não informado.";
+   OFICINA.api("/api/veiculos/" + v.placa).then(d => {
++    // PDFs das OS guardados nas visitas; abrem numa aba nova.
++    if (d.ordens.length) {
++      oss.append("OS em PDF: ");
++      d.ordens.forEach((o, i) => {
++        const a = el("a", null, fmtData(o.data) + (o.km != null ? " (" + fmtKm(o.km) + " km)" : ""));
++        a.href = "/api/ordens/" + o.id;
++        a.target = "_blank"; a.rel = "noopener";
++        a.title = o.nome_arquivo;
++        if (i) oss.append(" · ");
++        oss.append(a);
++      });
++    }
+     const nomes = Object.fromEntries(CFG.servicos.map(s => [s.id, s.nome]));
+     const porData = {};
+     for (const r of d.historico) (porData[r.data] ||= { km: r.km, itens: [] }).itens.push(nomes[r.servico] || r.servico);
+@@ -214,6 +249,7 @@ function detalhe(v) {
+ }
+ 
+ const CFG = window.ETIQUETA;
++const CFG_FONE = d => d.length === 10 ? "(" + d.slice(0, 2) + ") " + d.slice(2, 6) + "-" + d.slice(6) : window.ETQ.fone(d);
+ for (const s of CFG.servicos) { const o = el("option", null, s.nome); o.value = s.id; $("fServico").append(o); }
+ for (const id of ["fPlaca", "fStatus", "fServico", "fPrazo", "fVisita"]) $(id).addEventListener("input", render);
+ for (const b of document.querySelectorAll(".summary .chip"))
+diff --git a/frontend/oficina/gravar.html b/frontend/oficina/gravar.html
+index 56f98e2..b369587 100644
+--- a/frontend/oficina/gravar.html
++++ b/frontend/oficina/gravar.html
+@@ -3,7 +3,7 @@
+ <head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+-<title>Gravar etiqueta · Área da oficina</title>
++<title>Registrar visita · Área da oficina</title>
+ <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+ <link rel="stylesheet" href="../estilo.css">
+ 
+@@ -14,15 +14,15 @@
+     <img src="../logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
+     <nav class="menu" aria-label="Área da oficina">
+       <a href="frota.html">Frota</a>
+-      <a href="gravar.html">Gravar etiqueta</a>
++      <a href="gravar.html">Registrar visita</a>
+       <span class="quem"></span>
+       <button type="button" data-sair>Sair</button>
+     </nav>
+   </header>
+ 
+   <section class="card">
+-    <h2>1. Carregar etiqueta</h2>
+-    <p class="small" style="margin:0">Se o carro já tem etiqueta, leia os dados atuais para só atualizar o que mudou. Etiqueta nova: pule para o passo 2.</p>
++    <h2>1. Carregar dados</h2>
++    <p class="small" style="margin:0">Se o carro já tem etiqueta, leia os dados atuais para só atualizar o que mudou. Carro que já está no sistema é carregado ao digitar a placa. Carro novo: pule para o passo 2.</p>
+     <div class="actions">
+       <button class="b" id="btnLer" type="button">Ler etiqueta NFC</button>
+     </div>
+@@ -30,13 +30,24 @@
+       <label for="colar">Ou cole o link da etiqueta</label>
+       <input id="colar" type="url" placeholder="https://…?p=ABC1D23&amp;o=…" autocomplete="off">
+     </div>
++    <div class="msg" id="msgCarregar" hidden></div>
+   </section>
+ 
+   <form class="card" id="form" novalidate>
+     <h2>2. Dados da visita</h2>
++    <div class="field">
++      <label for="pdf">PDF da OS (opcional)</label>
++      <input id="pdf" type="file" accept="application/pdf,.pdf">
++      <span class="small" id="pdfMsg">O PDF fica guardado no sistema com a visita. Se ele tiver texto, os campos abaixo são preenchidos com placa, cliente, telefone, km e serviços.</span>
++    </div>
+     <div class="field">
+       <label for="placa">Placa</label>
+       <input id="placa" type="text" maxlength="8" autocomplete="off" placeholder="ABC1D23" style="text-transform:uppercase;font-family:var(--display);font-size:1.4rem;letter-spacing:.08em">
++      <span class="small" id="placaMsg" aria-live="polite"></span>
++    </div>
++    <div class="grid2">
++      <div class="field"><label for="nome">Nome do cliente</label><input id="nome" type="text" maxlength="120" autocomplete="off" autocapitalize="words"></div>
++      <div class="field"><label for="telefone">Telefone</label><input id="telefone" type="tel" maxlength="20" autocomplete="off" placeholder="(67) 99999-9999"></div>
+     </div>
+     <div class="grid2">
+       <div class="field"><label for="visitaKm">Km de hoje</label><input id="visitaKm" type="text" inputmode="numeric" autocomplete="off" placeholder="27.350"></div>
+@@ -45,14 +56,18 @@
+     <div class="field">
+       <label for="os">Colar itens da OS (opcional)</label>
+       <textarea id="os" rows="4" placeholder="Placa: ABC1D23&#10;KM do serviço: 27350&#10;244  TROCA DE OLEO E FILTROS COMPLETO PASSEIO  1  R$ 30,00 …"></textarea>
+-      <span class="small" id="osMsg">Cole a placa, o km e os itens da ordem de serviço; os serviços reconhecidos são marcados como feitos hoje.</span>
++      <span class="small" id="osMsg">Cole a placa, o km e os itens da ordem de serviço; os serviços reconhecidos são marcados como feitos hoje. O texto do PDF aparece aqui.</span>
+     </div>
+     <p class="small" style="margin:0">Marque os serviços feitos nesta visita para preencher com o km e a data de hoje. Os outros mantêm o último registro.</p>
+     <div id="servicos"></div>
++    <div class="actions">
++      <button class="b primary" id="btnSalvar" type="button">Salvar visita no sistema</button>
++    </div>
++    <div class="small" id="salvo" aria-live="polite">Salvar não depende da etiqueta: a visita, o cliente e o PDF vão para a tela de frota. A etiqueta pode ser gravada agora, no passo 3, ou depois pela tela de frota.</div>
+   </form>
+ 
+-  <section class="card">
+-    <h2>3. Gravar</h2>
++  <section class="card" id="etiqueta">
++    <h2>3. Gravar etiqueta (opcional)</h2>
+     <div class="field">
+       <label for="base">Endereço da página do cliente</label>
+       <input id="base" type="url" autocomplete="off" placeholder="https://seusite.com.br/etiqueta/">
+@@ -65,11 +80,10 @@
+     <div class="actions">
+       <button class="b primary" id="btnGravar" type="button">Gravar na etiqueta NFC</button>
+       <button class="b" id="btnCopiar" type="button">Copiar link</button>
+-      <button class="b" id="btnSalvar" type="button">Só salvar no sistema</button>
+       <a class="b" id="btnAbrir" href="#" target="_blank" rel="noopener">Ver como o cliente</a>
+     </div>
+     <div class="msg" id="msg" hidden></div>
+-    <div class="small" id="salvo" aria-live="polite">Gravar ou copiar o link também salva a visita no sistema, para a tela de frota.</div>
++    <div class="small">Gravar ou copiar o link também salva a visita, se ela ainda não foi salva.</div>
+     <div class="field">
+       <span class="lbl">QR code do mesmo link (alternativa à NFC)</span>
+       <div class="qr" id="qr"></div>
+@@ -93,7 +107,8 @@ const nfc = "NDEFReader" in window;
+ // Capacidade útil aproximada de cada chip para um link (bytes).
+ const CHIPS = [["NTAG213", 137], ["NTAG215", 496], ["NTAG216", 868]];
+ 
+-function aviso(tipo, texto) { const m = $("msg"); m.className = "msg " + tipo; m.textContent = texto; m.hidden = false; }
++function aviso(tipo, texto, alvo = "msg") { const m = $(alvo); m.className = "msg " + tipo; m.textContent = texto; m.hidden = false; }
++const fmtFone = s => { const d = String(s || "").replace(/\D/g, ""); return d.length === 10 ? "(" + d.slice(0, 2) + ") " + d.slice(2, 6) + "-" + d.slice(6) : U.fone(s); };
+ 
+ // Monta as linhas de serviço
+ const box = $("servicos");
+@@ -125,13 +140,50 @@ function marcar(cb) {
+   else { km.value = cb.dataset.km || ""; dt.value = cb.dataset.dt || ""; }
+ }
+ 
+-// Lê o texto colado da OS: placa e serviços reconhecidos pelos trechos "os" do config.js.
++// Nome em maiúsculas na OS vira "João da Silva".
++function capitalizar(nome) {
++  if (nome !== nome.toUpperCase()) return nome;
++  return nome.toLowerCase().replace(/(^|\s)(\S)/g, (m, e, l) => e + l.toUpperCase())
++    .replace(/ (Da|De|Do|Das|Dos|E) /g, m => m.toLowerCase());
++}
++
++// Nome do cliente: o que vem depois de "Cliente:" (ou "Proprietário:", "Nome:") até o próximo campo da linha.
++function lerNome(texto) {
++  for (const rotulo of ["cliente", "propriet[aá]rio", "nome do cliente", "nome"]) {
++    const m = texto.match(new RegExp("(?:^|[\\s|])" + rotulo + "\\s*:\\s*([^\\n]+)", "i"));
++    if (!m) continue;
++    const nome = m[1].split(/\s{2,}|\s+(?:cpf|cnpj|rg|tel|telefone|fone|celular|cel|whats\w*|e-?mail|placa|ve[ií]culo|data|endere[cç]o|c[oó]d)\b/i)[0]
++      .replace(/^\d+\s*[-–]\s*/, "").replace(/[\s,;:.-]+$/, "").trim();
++    if (/[A-Za-zÀ-ú]{2}/.test(nome)) return capitalizar(nome).slice(0, 120);
++  }
++  return "";
++}
++
++// Telefone do cliente: primeiro o que tem rótulo (Telefone, Celular…), depois qualquer número; nunca o da oficina.
++function lerTelefone(t) {
++  const fone = "\\(?\\d{2}\\)?\\s*9?\\s?\\d{4}[\\s.-]?\\d{4}";
++  const daOficina = String(CFG.oficina.whatsapp).replace(/^55/, "");
++  const candidatos = [
++    ...t.matchAll(new RegExp("(?:TELEFONE|TEL|FONE|CELULAR|CEL|WHATSAPP|CONTATO)\\.?\\s*:?\\s*(?:\\+?55\\s*)?(" + fone + ")", "g")),
++    ...t.matchAll(new RegExp("(?<![\\d/])(" + fone + ")(?![\\d/])", "g"))
++  ].map(m => m[1].replace(/\D/g, ""));
++  return candidatos.find(d => (d.length === 10 || d.length === 11) && d !== daOficina) || "";
++}
++
++// Lê o texto da OS (colado ou do PDF): placa, cliente, telefone, km, data e serviços pelos trechos "os" do config.js.
+ function lerOS(texto) {
+-  const t = texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
++  const t = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+   const mp = t.match(/PLACA\s*:?\s*([A-Z]{3}-?\d[A-Z0-9]\d{2})/);
+   if (mp) $("placa").value = U.placa(mp[1]);
+-  const mk = t.match(/\bKM\b[^:\n]*:\s*([\d.]+)/);
++  const nome = lerNome(texto), tel = lerTelefone(t);
++  if (nome) $("nome").value = nome;
++  if (tel) $("telefone").value = fmtFone(tel);
++  const mk = t.match(/(?:\bKM\b|QUILOMETRAGEM|HODOMETRO|ODOMETRO)[^:\n]{0,25}:\s*([\d.]+)/);
+   if (mk) $("visitaKm").value = fmtKm(U.km(mk[1]));
++  // Data da OS (para registrar uma visita antiga); data no futuro ou de nascimento não vale.
++  const md = t.match(/(?:DATA|EMISSAO|ENTRADA|ABERTURA)(?![^:\n]*NASC)[^:\n]{0,20}:\s*(\d{2}\/\d{2}\/\d{4})/);
++  const dOS = md && U.data(md[1]);
++  if (dOS && dOS <= new Date()) $("visitaDt").value = U.iso(dOS);
+   const achados = [];
+   for (const s of CFG.servicos) {
+     if (!(s.os || []).some(k => t.includes(k))) continue;
+@@ -141,8 +193,103 @@ function lerOS(texto) {
+   }
+   preencherFeitos();
+   $("osMsg").textContent = (mp ? "Placa " + U.placa(mp[1]) + ". " : "Placa não encontrada. ") +
++    (nome ? "Cliente " + nome + ". " : "") + (tel ? "Telefone " + fmtFone(tel) + ". " : "") +
++    (dOS && dOS <= new Date() ? "Data " + md[1] + ". " : "") +
+     (achados.length ? "Marcados: " + achados.join(", ") + "." : "Nenhum serviço da etiqueta encontrado.") +
+     ($("visitaKm").value ? "" : " Falta o km de hoje.");
++  if (mp) buscarNoSistema();
++}
++
++// PDF da OS: o texto é extraído no próprio navegador (pdf.js) e passa pelo mesmo leitor do texto colado.
++const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
++let pdfjs = null;
++function carregarPdfJs() {
++  return pdfjs ||= new Promise((ok, erro) => {
++    const s = document.createElement("script");
++    s.src = PDFJS + "pdf.min.js";
++    s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; ok(pdfjsLib); };
++    s.onerror = () => { pdfjs = null; erro(new Error("sem internet para ler o PDF")); };
++    document.head.append(s);
++  });
++}
++
++async function textoDoPdf(arquivo) {
++  const lib = await carregarPdfJs();
++  const doc = await lib.getDocument({ data: await arquivo.arrayBuffer() }).promise;
++  const linhas = [];
++  for (let n = 1; n <= Math.min(doc.numPages, 5); n++) {
++    const itens = (await (await doc.getPage(n)).getTextContent()).items.filter(i => i.str && i.str.trim());
++    // Junta os pedaços que estão na mesma altura da página, da esquerda para a direita.
++    const porY = [];
++    for (const i of itens) {
++      const x = i.transform[4], y = i.transform[5], h = Math.abs(i.transform[3]) || i.height || 10;
++      let l = porY.find(l => Math.abs(l.y - y) < l.h * 0.5);
++      if (!l) porY.push(l = { y, h, itens: [] });
++      l.itens.push({ x, w: i.width, s: i.str });
++    }
++    porY.sort((a, b) => b.y - a.y);
++    for (const l of porY) {
++      l.itens.sort((a, b) => a.x - b.x);
++      let txt = "", fim = null;
++      // Espaço grande entre pedaços separa colunas (vira 3 espaços, que encerram o nome do cliente).
++      for (const i of l.itens) {
++        if (fim != null) txt += i.x - fim > l.h ? "   " : i.x - fim > l.h * 0.15 && !/\s$/.test(txt) ? " " : "";
++        txt += i.s;
++        fim = i.x + i.w;
++      }
++      linhas.push(txt.trimEnd());
++    }
++  }
++  return linhas.join("\n");
++}
++
++$("pdf").addEventListener("change", async () => {
++  const f = $("pdf").files[0];
++  pdfSalvo = "";
++  alterado();
++  if (!f) { $("pdfMsg").textContent = "Nenhum PDF escolhido."; return; }
++  if (f.size > 10 * 1024 * 1024) { $("pdfMsg").textContent = "PDF maior que 10 MB; escolha outro."; $("pdf").value = ""; return; }
++  $("pdfMsg").textContent = "Lendo o PDF…";
++  try {
++    const texto = await textoDoPdf(f);
++    if (texto.replace(/\s/g, "").length < 20) {
++      $("pdfMsg").textContent = "O PDF não tem texto (parece imagem escaneada). Ele será guardado, mas preencha os campos à mão.";
++      return;
++    }
++    $("os").value = texto;
++    lerOS(texto);
++    atualizar();
++    $("pdfMsg").textContent = "Campos preenchidos pelo PDF; confira antes de salvar. O PDF vai junto ao salvar a visita.";
++  } catch (e) {
++    $("pdfMsg").textContent = "Não consegui ler o texto do PDF (" + e.message + "). Ele será guardado mesmo assim; preencha os campos à mão.";
++  }
++});
++
++// Carro que já está no sistema: completa cliente, telefone e serviços que estiverem em branco.
++let placaBuscada = "";
++async function buscarNoSistema(forcar) {
++  const placa = U.placa($("placa").value);
++  if (placa.length !== 7 || (placa === placaBuscada && !forcar)) return;
++  placaBuscada = placa;
++  let d;
++  try { d = await OFICINA.api("/api/veiculos/" + placa); }
++  catch (e) { $("placaMsg").textContent = e.message === "Placa sem registros." ? "Placa nova no sistema." : ""; return; }
++  if (U.placa($("placa").value) !== placa) return;
++  const preenchidos = [];
++  if (!$("nome").value.trim() && d.cliente.nome) { $("nome").value = d.cliente.nome; preenchidos.push("cliente"); }
++  if (!$("telefone").value.trim() && d.cliente.telefone) { $("telefone").value = fmtFone(d.cliente.telefone); preenchidos.push("telefone"); }
++  // Os serviços só vêm do sistema se a tela ainda não tem nenhum (etiqueta lida ou digitada vale mais).
++  const vazio = CFG.servicos.every(s => !$("km-" + s.id).value && !$("dt-" + s.id).value);
++  if (vazio && d.servicos.length) {
++    for (const s of d.servicos) {
++      $("km-" + s.servico).value = fmtKm(s.ultimo_km);
++      $("dt-" + s.servico).value = s.ultima_data;
++    }
++    preenchidos.push("últimos serviços");
++  }
++  $("placaMsg").textContent = "Placa já está no sistema" + (d.ultima_visita ? ", última visita em " + U.data(d.ultima_visita).toLocaleDateString("pt-BR") : "") +
++    "." + (preenchidos.length ? " Preenchido: " + preenchidos.join(", ") + "." : "");
++  atualizar();
+ }
+ 
+ function montarLink() {
+@@ -172,6 +319,7 @@ function atualizar() {
+   $("tamanho").textContent = bytes + " bytes. " + (cabe.length ? "Cabe em: " + cabe.join(", ") + "." : "Grande demais para as etiquetas comuns.");
+   const ok = U.placa($("placa").value).length === 7;
+   $("btnGravar").disabled = !ok;
++  $("btnSalvar").disabled = !ok;
+   $("btnGravar").title = ok ? "" : "Informe a placa com 7 caracteres";
+   const q = $("qr"); q.replaceChildren();
+   if (window.QRCode) new QRCode(q, { text: url, width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
+@@ -191,12 +339,20 @@ function carregar(url) {
+   }
+   if (!$("base").value.trim()) $("base").value = url.split("?")[0];
+   atualizar();
+-  aviso("ok", "Dados da etiqueta carregados" + ($("placa").value ? " para a placa " + $("placa").value : "") + ". Marque o que foi feito hoje e grave.");
++  aviso("ok", "Dados da etiqueta carregados" + ($("placa").value ? " para a placa " + $("placa").value : "") + ". Marque o que foi feito hoje e salve.", "msgCarregar");
++  buscarNoSistema();
+   // O histórico da etiqueta também vale para a frota (carros que ainda não estão no sistema).
+   salvar("leitura");
+ }
+ 
+-// Salva no backend o que está na tela (a etiqueta inteira). Repetir não duplica.
++// Salva no backend o que está na tela: serviços (a etiqueta inteira), cliente e PDF da OS. Repetir não duplica.
++// origem "leitura" (etiqueta lida) só manda os serviços.
++let salvoAgora = false, pdfSalvo = "";
++function alterado() {
++  if (salvoAgora) $("salvo").textContent = "Há alterações que ainda não foram salvas.";
++  salvoAgora = false;
++}
++
+ async function salvar(origem) {
+   const placa = U.placa($("placa").value);
+   const servicos = [];
+@@ -204,15 +360,37 @@ async function salvar(origem) {
+     const d = U.data($("dt-" + s.id).value);
+     if (d) servicos.push({ servico: s.id, km: U.km($("km-" + s.id).value), data: U.iso(d) });
+   }
+-  if (placa.length !== 7 || !servicos.length) {
+-    if (origem === "botao") $("salvo").textContent = "Para salvar, informe a placa e a data de pelo menos um serviço.";
++  const leitura = origem === "leitura", pdf = leitura ? null : $("pdf").files[0];
++  const nome = leitura ? "" : $("nome").value.trim(), telefone = leitura ? "" : $("telefone").value.trim();
++  if (placa.length !== 7 || (!servicos.length && !nome && !telefone && !pdf)) {
++    if (origem === "botao") $("salvo").textContent = "Para salvar, informe a placa e pelo menos um serviço, o cliente ou o PDF da OS.";
+     return;
+   }
++  // Depois de gravar ou copiar, só salva se ainda não salvou.
++  if ((origem === "gravacao" || origem === "copia") && salvoAgora) return;
++  const dataVisita = $("visitaDt").value || U.iso(new Date());
++  $("btnSalvar").disabled = true;
+   try {
+-    await OFICINA.api("/api/registros", { method: "POST", body: JSON.stringify({ placa, servicos }) });
+-    $("salvo").textContent = "Salvo no sistema: placa " + placa + ", " + servicos.length + (servicos.length === 1 ? " serviço." : " serviços.");
++    const corpo = { placa, servicos };
++    if (!leitura) Object.assign(corpo, { nome, telefone });
++    await OFICINA.api("/api/registros", { method: "POST", body: JSON.stringify(corpo) });
++    let txtPdf = "";
++    const chavePdf = pdf && [pdf.name, pdf.size, pdf.lastModified, placa, dataVisita].join("|");
++    if (pdf && chavePdf !== pdfSalvo) {
++      const q = new URLSearchParams({ placa, data: dataVisita, nome: pdf.name });
++      const km = U.km($("visitaKm").value);
++      if (km != null) q.set("km", km);
++      await OFICINA.api("/api/ordens?" + q, { method: "POST", body: pdf, headers: { "Content-Type": "application/pdf" } });
++      pdfSalvo = chavePdf;
++    }
++    if (pdf) txtPdf = ", PDF da OS";
++    if (!leitura) { salvoAgora = true; $("placaMsg").textContent = ""; }
++    $("salvo").textContent = "Salvo no sistema: placa " + placa + ", " + servicos.length + (servicos.length === 1 ? " serviço" : " serviços") +
++      (nome || telefone ? ", cliente" : "") + txtPdf + ". A etiqueta pode ser gravada agora ou depois pela tela de frota.";
+   } catch (e) {
+-    $("salvo").textContent = "Não salvou no sistema (" + e.message + "). A etiqueta não é afetada; tente \"Só salvar no sistema\".";
++    $("salvo").textContent = "Não salvou no sistema (" + e.message + "). Confira os dados e clique em \"Salvar visita no sistema\" de novo.";
++  } finally {
++    atualizar();
+   }
+ }
+ 
+@@ -266,8 +444,9 @@ $("form").addEventListener("input", e => {
+   const t = e.target;
+   if (t.id === "os") lerOS(t.value);
+   if (t.inputMode === "numeric") { const n = U.km(t.value); t.value = n == null ? "" : fmtKm(Math.min(n, 9999999)); }
+-  if (t.id === "placa") t.value = U.placa(t.value);
++  if (t.id === "placa") { t.value = U.placa(t.value); $("placaMsg").textContent = ""; buscarNoSistema(); }
+   if (t.type === "checkbox") marcar(t);
++  if (t.id !== "pdf") alterado();
+   if (t.id === "visitaKm" || t.id === "visitaDt") preencherFeitos();
+   atualizar();
+ });
+@@ -282,6 +461,12 @@ $("linkCliente").href = CFG.paginaCliente;
+ OFICINA.menu();
+ if (!nfc) $("btnGravar").textContent = "Gravar na etiqueta NFC (só Chrome Android)";
+ atualizar();
++// Vindo da tela de frota (?placa=…): carrega o carro do sistema; "#etiqueta" vai direto para a gravação.
++const placaUrl = U.placa(new URLSearchParams(location.search).get("placa"));
++if (placaUrl) {
++  $("placa").value = placaUrl;
++  buscarNoSistema().then(() => { if (location.hash === "#etiqueta") $("etiqueta").scrollIntoView(); });
++}
+ </script>
+ </body>
+ </html>
+-- 
+2.43.0
+
