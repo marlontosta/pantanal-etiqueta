@@ -153,7 +153,7 @@ function capitalizar(nome) {
 
 // Nome do cliente: o que vem depois de "Cliente", "Nome", "Razão social" ou "Proprietário" até o próximo
 // campo da linha. Se o rótulo estiver sozinho na linha, o nome é a linha seguinte.
-const ROTULOS_NOME = ["nome do cliente", "nome\\s*/\\s*raz[aã]o social", "raz[aã]o social", "cliente", "propriet[aá]rio", "nome"];
+const ROTULOS_NOME = ["nome do cliente", "nome\\s*/\\s*raz[aã]o social", "raz[aã]o social", "cliente", "propriet[aá]rio", "nome(?:\\s+[a-zà-ú]+){1,2}(?=\\s*:)", "nome"];
 const FIM_NOME = /\s{2,}|\s*\||\s+(?:cpf|cnpj|cpf\/cnpj|rg|ie|tel|telefone|fone|celular|cel|whats\w*|e-?mail|placa|ve[ií]culo|modelo|data|endere[cç]o|c[oó]d\w*|cidade|bairro|cep)\b/i;
 
 function limparNome(v) {
