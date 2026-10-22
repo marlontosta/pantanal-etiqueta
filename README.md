@@ -49,7 +49,6 @@ https://marlontosta.github.io/pantanal-etiqueta/?p=LMV4G22&o=21fu.1wv&r=o&g=o
 | `r`       | Revisão mecânica (suspensão, freios e demais itens)      |
 | `g`       | Geometria (alinhamento e balanceamento)                  |
 | `h`       | Higienização do ar-condicionado                          |
-| `t`       | Telefone do cliente (só dígitos, sem o 55): abas com os outros veículos dele |
 
 Cada serviço vale `KM.DIA`, os dois em base 36: km rodado e dias desde 01/01/2020.
 `21fu.1wv` é 95.178 km em 15/10/2026. `KM.` guarda só o km e `.DIA` só a data.
@@ -59,8 +58,6 @@ que é o caso comum de vários serviços feitos na mesma visita.
 - A área da oficina monta esse formato sozinha; não é preciso calcular à mão.
 - Qualquer serviço pode faltar; ele aparece como "Sem registro".
 - Sem nenhum parâmetro, `index.html` mostra um exemplo de demonstração.
-- `t` entra quando o telefone do cliente está preenchido na tela de visita. Se com ele o link não
-  couber na NTAG213, ele fica de fora (a tela avisa) e a etiqueta funciona como antes, sem abas.
 
 As letras, intervalos (km e meses) e margens de aviso ficam em `frontend/cliente/config.js`.
 Se mudar um intervalo, mude também em `backend/app/config.py` (um teste avisa se ficarem diferentes).
@@ -151,21 +148,20 @@ Km de placa que ainda não tem visita fica guardado e entra quando ela tiver.
 
 ### Veículos do mesmo cliente (abas na etiqueta)
 
-Quando o link da etiqueta tem o telefone do cliente (`t`), a página do cliente busca os outros
-veículos com o mesmo telefone (tabela `clientes`) e, se houver mais de um, mostra uma aba por placa
-acima da etiqueta. A aba da placa lida começa ativa e usa os dados do próprio link; as outras usam
-os dados do sistema no mesmo formato (última visita e km de cada serviço) e funcionam igual: km
-atual, previsões, envio do km e WhatsApp. Sem `t`, sem resposta ou com um veículo só, não aparecem
-abas. Nome, telefone e PDFs das OS não são enviados.
+Ao abrir a etiqueta, a página pergunta ao backend quais carros têm o mesmo telefone cadastrado
+(tabela `clientes`) que a placa lida. Com mais de um, mostra uma aba por placa acima da etiqueta. A
+aba da placa lida começa ativa e usa os dados do próprio link; as outras usam os dados do sistema no
+mesmo formato (última visita e km de cada serviço) e funcionam igual: km atual, previsões, envio do
+km e WhatsApp. Sem telefone cadastrado, sem resposta ou com um veículo só, não aparecem abas. O
+telefone não vai no link nem na resposta; nome e PDFs das OS também não.
 
-- A identificação é só o telefone (`cliente_confere` em `backend/app/main.py`, que hoje só confere
-  se o telefone está no cadastro). Para trocar o método (código pelo WhatsApp, por exemplo), mude
-  só ela.
-- Telefone fora do cadastro ou dados inválidos dão sempre a mesma mensagem; cada endereço IP pode
-  consultar 10 vezes a cada 15 minutos.
-- O endereço da consulta é `minhaFrota` no `config.js`; vazio desliga as abas. A página no GitHub
-  Pages lê a resposta porque o backend manda `Access-Control-Allow-Origin` para os sites de
-  `PANTANAL_ORIGENS_CLIENTE`; o pedido vai em texto puro, sem preflight de CORS.
+- Quem vê o quê fica numa função só (`placas_do_cliente` em `backend/app/main.py`).
+- Pedido inválido devolve a lista vazia (sem abas); cada endereço IP pode consultar 60 vezes a cada
+  15 minutos.
+- O endereço da consulta é `minhaFrota` no `config.js`; vazio desliga as abas. Servida pelo backend,
+  a página usa a API do mesmo endereço; a cópia no GitHub Pages lê a resposta porque o backend manda
+  `Access-Control-Allow-Origin` para os sites de `PANTANAL_ORIGENS_CLIENTE`; o pedido vai em texto
+  puro, sem preflight de CORS.
 
 ### Tela de frota
 
@@ -203,7 +199,7 @@ e "Registrar nova visita".
 | `GET /api/ordens/{id}`     | abre o PDF de uma OS                        |
 | `POST /api/leituras`       | `{placa, km}` do cliente, sem login, em texto puro; sempre `{ok: true}` |
 | `POST /api/veiculos/{placa}/km` | `{km}` km atual informado pela oficina   |
-| `POST /api/minha-frota`    | `{telefone}` sem login, em texto puro → veículos desse telefone (sem nome/telefone/OS) |
+| `POST /api/minha-frota`    | `{placa}` sem login, em texto puro → veículos do mesmo telefone da placa (sem nome/telefone/OS) |
 | `GET /api/frota`           | resumo de todas as placas                  |
 | `GET /api/veiculos/{placa}`| resumo e histórico de uma placa            |
 

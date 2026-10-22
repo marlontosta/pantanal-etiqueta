@@ -253,7 +253,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && esp
 
 mostrarVeiculo();
 
-// Abas: com o telefone do cliente no link (t), a página busca os outros veículos do mesmo telefone.
+// Abas: a página pergunta ao backend quais carros têm o mesmo telefone cadastrado que a placa lida.
 // A aba de cada placa mostra os dados do sistema no mesmo formato da etiqueta; a da etiqueta lida
 // usa o próprio link e começa ativa.
 function linkDoVeiculo(v) {
@@ -304,12 +304,11 @@ function montarAbas(veiculos) {
   botoes.find(b => b.textContent === placa).scrollIntoView({ block: "nearest", inline: "center" });
 }
 
-const telefone = (daEtiqueta.get("t") || "").replace(/\D/g, "");
-if (CFG.minhaFrota && temDados && telefone.length >= 10) {
-  fetch(U.api(CFG.minhaFrota), { method: "POST", body: JSON.stringify({ telefone }) })
+if (CFG.minhaFrota && temDados && /^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(placa)) {
+  fetch(U.api(CFG.minhaFrota), { method: "POST", body: JSON.stringify({ placa }) })
     .then(r => r.ok ? r.json() : null)
     .then(d => {
-      // Só com mais de um veículo, e se a placa da etiqueta for mesmo desse telefone.
+      // Só com mais de um veículo.
       if (d && d.veiculos.length > 1 && d.veiculos.some(v => v.placa === placa)) montarAbas(d.veiculos);
     }, () => {});
 }

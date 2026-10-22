@@ -14,7 +14,7 @@ window.ETIQUETA = {
   // Para onde vai o km que o cliente digita (estimativa de km/dia na frota). Vazio não envia.
   // Endereço completo, porque a página também é publicada no GitHub Pages (etiquetas antigas).
   envioKm: "https://marlao.pythonanywhere.com/api/leituras",
-  // Outros veículos do mesmo telefone (parâmetro t da etiqueta), mostrados em abas. Vazio desliga.
+  // Outros veículos do mesmo cliente (telefone cadastrado para a placa), mostrados em abas. Vazio desliga.
   minhaFrota: "https://marlao.pythonanywhere.com/api/minha-frota",
   // Plataforma com o histórico detalhado: link direto para o login/cadastro do cliente.
   sobreRodas: { nome: "Sobre Rodas", url: "https://sobrerodas.club/client/login" },

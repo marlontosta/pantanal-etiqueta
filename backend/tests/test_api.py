@@ -161,32 +161,35 @@ def test_km_do_cliente_guarda_so_os_ultimos(cliente, logado):
     assert len(datas) == main.MAX_LEITURAS_CLIENTE and datas[-1] == config.hoje().isoformat()
 
 
+
 def test_minha_frota(cliente, logado):
     antes = (config.hoje() - timedelta(days=50)).isoformat()
     for placa, tel in (("LMV4G22", "(67) 99123-4567"), ("ABC1D23", "+55 67 99123 4567"), ("QWE1R23", "67988887777")):
         logado.post("/api/registros", json={"placa": placa, "nome": "Fulano", "telefone": tel,
                                             "servicos": [{"servico": "oleo", "km": 90000, "data": antes}]})
+    logado.post("/api/registros", json={"placa": "RST2U34", "servicos": [{"servico": "oleo", "km": 1000, "data": antes}]})
     logado.post("/api/veiculos/LMV4G22/km", json={"km": 92500})
     logado.post("/api/sair")
-    pede = lambda tel, **kw: cliente.post("/api/minha-frota", content='{"telefone":"%s"}' % tel, **kw)
-    r = pede("67 99123-4567", headers={"origin": "https://marlontosta.github.io"})
+    pede = lambda corpo, **kw: cliente.post("/api/minha-frota", content=corpo, **kw)
+    placas = lambda r: [v["placa"] for v in r.json()["veiculos"]]
+    # A placa lida acha o telefone do cadastro e devolve todas as placas desse telefone.
+    r = pede('{"placa":"lmv-4g22"}', headers={"origin": "https://marlontosta.github.io"})
     assert r.status_code == 200 and r.headers["access-control-allow-origin"] == "https://marlontosta.github.io"
     v = r.json()["veiculos"]
-    assert [c["placa"] for c in v] == ["ABC1D23", "LMV4G22"]
+    assert placas(r) == ["ABC1D23", "LMV4G22"]
     assert v[1]["km_atual"] == 92500 and v[1]["origem_km"] == "oficina" and v[0]["origem_km"] == "visita"
     assert v[0]["servicos"][0]["servico"] == "oleo" and v[0]["servicos"][0]["proximo_km"] == 100000
     # Nada de nome, telefone ou OS.
     assert "Fulano" not in r.text and "99123" not in r.text and "ordens" not in r.text
-    # Placa enviada pela versão anterior da página é ignorada.
-    assert cliente.post("/api/minha-frota", content='{"telefone":"67988887777","placa":"LMV4G22"}').json()["veiculos"][0]["placa"] == "QWE1R23"
-    # Telefone fora do cadastro ou dados inválidos: o mesmo erro.
-    erros = [pede("67900000000"), pede(""), pede("x"), cliente.post("/api/minha-frota", content='{"placa":"LMV4G22"}'),
-             cliente.post("/api/minha-frota", content="lixo")]
-    assert {e.status_code for e in erros} == {404} and len({e.json()["detail"] for e in erros}) == 1
+    # Outro telefone; placa sem telefone; placa fora do cadastro; pedido inválido ou só com telefone.
+    assert placas(pede('{"placa":"QWE1R23"}')) == ["QWE1R23"]
+    assert placas(pede('{"placa":"RST2U34"}')) == ["RST2U34"]
+    assert placas(pede('{"placa":"ZZZ9Z99"}')) == ["ZZZ9Z99"] and pede('{"placa":"ZZZ9Z99"}').json()["veiculos"][0]["servicos"] == []
+    assert [pede(c).json()["veiculos"] for c in ('{"telefone":"67991234567"}', '{"placa":"XX"}', "lixo")] == [[], [], []]
     # Outro site não lê a resposta.
-    assert "access-control-allow-origin" not in pede("67991234567", headers={"origin": "https://outro.com"}).headers
-    # Limite por IP: 10 consultas em 15 minutos (8 já foram).
-    for _ in range(2):
-        assert pede("67991234567").status_code == 200
-    r = pede("67991234567", headers={"origin": "https://marlontosta.github.io"})
+    assert "access-control-allow-origin" not in pede('{"placa":"LMV4G22"}', headers={"origin": "https://outro.com"}).headers
+    # Limite por IP: 60 consultas em 15 minutos (9 já foram).
+    for _ in range(51):
+        assert pede('{"placa":"LMV4G22"}').status_code == 200
+    r = pede('{"placa":"LMV4G22"}', headers={"origin": "https://marlontosta.github.io"})
     assert r.status_code == 429 and r.headers["access-control-allow-origin"] == "https://marlontosta.github.io"
