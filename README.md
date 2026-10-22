@@ -122,9 +122,9 @@ estão no sistema. O mesmo serviço na mesma placa e no mesmo dia não duplica.
   OS e serviços, igual ao texto colado. Os campos podem ser corrigidos antes de salvar. A placa
   vem depois de "Placa" ou, se não tiver rótulo, é a primeira no formato `ABC-1234`/`ABC1D23`.
 - **Gravar pelo celular**: no computador não dá para gravar NFC. Depois de salvar, a tela mostra
-  um QR code (e a frota tem o botão "QR para gravar pelo celular") que abre a mesma placa no
-  celular, com os dados do sistema, direto na gravação. Se o celular não estiver logado, o login
-  volta para a placa.
+  um QR code (e a frota tem o botão "QR para gravar a etiqueta") que abre a mesma placa no
+  celular, com os dados do sistema, direto na gravação. Na frota, tocar ou clicar no QR abre a
+  mesma tela na aba atual. Se o celular não estiver logado, o login volta para a placa.
 
 Na página do cliente, o km que ele digita em "Quilometragem atual" é enviado ao backend
 (`envioKm` no `config.js`) uns segundos depois que ele para de digitar, só se for maior que o
@@ -140,15 +140,17 @@ Uma linha por placa, com última visita, km na visita, km/dia, km atual, próxim
 previsão, dias e km que faltam e situação. Clique em qualquer coluna para ordenar (de novo
 inverte). Filtros: placa ou nome do cliente, situação, serviço, prazo da previsão e data da última
 visita. Clicar numa linha mostra cliente e telefone (link para o WhatsApp), todos os serviços do
-carro, o histórico de visitas, os PDFs das OS e os botões "Gravar etiqueta com estes dados" (abre
-a tela de visita com o carro carregado, direto na gravação) e "Registrar nova visita".
+carro, o histórico de visitas, os PDFs das OS, os km informados fora das visitas (os 10 mais
+recentes, com a origem: cliente ou oficina) e os botões "QR para gravar a etiqueta" (mostra o QR
+que abre a tela de visita com o carro carregado, direto na gravação; tocar no QR abre a mesma tela)
+e "Registrar nova visita".
 
 - **Km/dia**: (último km conhecido − primeiro) ÷ dias entre eles, contando as visitas e o km
   digitado pelo cliente. Precisa de pelo menos dois dias com km e 7 dias entre eles; km que
   diminui não gera média.
 - **Km atual**: último km conhecido + km/dia × dias desde então (marcado "est." quando
   estimado, e "cliente" quando o último km veio do cliente). "Km na visita" é sempre o da oficina.
-- O detalhe da placa lista os km informados pelo cliente, marcando os ignorados.
+- O detalhe da placa lista os km informados pelo cliente e pela oficina, marcando os ignorados.
 - **Km atual hoje**: no lápis ✎ da coluna "Km atual", a oficina pode informar o km do dia (cliente ligou ou
   passou na loja). Entra na estimativa como o km do cliente, com a marca "oficina", e precisa bater
   com as visitas. O km que o cliente digitar no mesmo dia não troca o da oficina.

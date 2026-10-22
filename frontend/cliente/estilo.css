@@ -141,6 +141,11 @@ h1 { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.05; text-wra
 .celular { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; border: 1px dashed var(--line); border-radius: 12px; padding: 12px; }
 .celular .small { flex: 1 1 200px; }
 .celular[hidden] { display: none; }
+.qr-fig { display: grid; justify-items: center; gap: 6px; }
+.qr-link { cursor: pointer; text-decoration: none; color: var(--ink); }
+.qr-link:hover { box-shadow: 0 0 0 3px var(--brand); }
+.qr-link:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.qr-legenda { font-size: .8rem; color: var(--muted); text-align: center; }
 
 /* Área da oficina (login, frota) */
 .wrap.largo { max-width: 1180px; }

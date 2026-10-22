@@ -208,27 +208,29 @@ function detalhe(v) {
   }
   t.append(tb);
   const cli = el("p", "small"), hist = el("p", "small", "Carregando histórico…"), leit = el("p", "small"), oss = el("p", "small");
-  // Gravar a etiqueta (ou registrar nova visita) com os dados do sistema, na tela de visita.
+  // Gravar a etiqueta: o QR abre a tela de visita com os dados do sistema, direto na gravação.
+  // No computador, leia com o celular (NFC); no celular, toque no QR.
   const acoes = el("div", "actions");
-  const gravar = el("a", "b primary", "Gravar etiqueta com estes dados");
-  gravar.href = "gravar.html?placa=" + v.placa + "&etiqueta=1";
   const nova = el("a", "b", "Registrar nova visita");
   nova.href = "gravar.html?placa=" + v.placa;
-  // No computador não dá para gravar NFC: o QR abre a mesma tela no celular.
-  const btnQr = el("button", "b", "QR para gravar pelo celular");
+  const btnQr = el("button", "b primary", "QR para gravar a etiqueta");
   btnQr.type = "button";
   const qrBox = el("div", "celular");
   qrBox.hidden = true;
   btnQr.addEventListener("click", () => {
     qrBox.hidden = !qrBox.hidden;
     if (qrBox.hidden || qrBox.childElementCount) return;
-    const q = el("div", "qr");
-    const url = new URL(gravar.getAttribute("href"), location.href).href;
+    const url = new URL("gravar.html?placa=" + v.placa + "&etiqueta=1", location.href).href;
+    const q = el("a", "qr qr-link");
+    q.href = url;
+    q.title = "Abrir a gravação da etiqueta da placa " + v.placa;
     if (window.QRCode) new QRCode(q, { text: url, width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
-    else q.textContent = "O QR code precisa de internet para aparecer.";
-    qrBox.append(q, el("div", "small", "Leia com o celular (Chrome no Android, logado na área da oficina) para gravar a etiqueta da placa " + v.placa + " por NFC."));
+    else q.textContent = "Gravar etiqueta (o QR code precisa de internet para aparecer).";
+    const fig = el("div", "qr-fig");
+    fig.append(q, el("span", "qr-legenda", "Toque ou leia com o celular para gravar"));
+    qrBox.append(fig, el("div", "small", "Grava a etiqueta da placa " + v.placa + " por NFC (Chrome no Android, logado na área da oficina)."));
   });
-  acoes.append(gravar, btnQr, nova);
+  acoes.append(btnQr, nova);
   td.append(cli, t, hist, oss, leit, acoes, qrBox);
   tr.append(td);
   if (v.cliente.nome || v.cliente.telefone) {
@@ -259,9 +261,12 @@ function detalhe(v) {
     hist.textContent = "Histórico: " + Object.entries(porData).map(([dt, x]) =>
       fmtData(dt) + (x.km != null ? " (" + fmtKm(x.km) + " km)" : "") + ": " + x.itens.join(", ")).join(" · ");
     // Km que o cliente digitou na página da etiqueta ou a oficina informou aqui; os que não batem com as visitas ficam fora da conta.
-    if (d.leituras.length) leit.textContent = "Km informado fora das visitas: " + d.leituras.map(l =>
+    // Só os mais recentes (a lista vem do mais novo para o mais antigo).
+    const recentes = d.leituras.slice(0, 10);
+    if (recentes.length) leit.textContent = "Km informado fora das visitas: " + recentes.map(l =>
       fmtData(l.data) + " " + fmtKm(l.km) + " km (" + (l.origem === "oficina" ? "oficina" : "cliente") + ")" +
-      (l.usada ? "" : " (ignorado, não bate com as visitas)")).join(" · ");
+      (l.usada ? "" : " (ignorado, não bate com as visitas)")).join(" · ") +
+      (d.leituras.length > recentes.length ? " · e mais " + (d.leituras.length - recentes.length) + " anteriores" : "");
   }).catch(e => { hist.textContent = "Não carregou o histórico: " + e.message; });
   return tr;
 }
