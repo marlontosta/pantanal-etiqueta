@@ -332,18 +332,18 @@ def ver_veiculo(placa: str, u=Depends(usuario_logado)):
             "leituras": frota.leituras_validas(regs, leituras)[::-1]}
 
 
-# Minha frota: o cliente vê os carros do telefone dele na página pública (frontend/cliente/frota.html).
+# Veículos do cliente: a página da etiqueta mostra em abas os carros do mesmo telefone (parâmetro t).
 # Texto puro, como /api/leituras, para a página no GitHub Pages não precisar de preflight de CORS;
 # o cabeçalho Access-Control-Allow-Origin deixa essa página ler a resposta.
 
-ERRO_MINHA_FROTA = "Não encontramos veículos com esse telefone e essa placa. Confira os dados ou fale com a oficina."
+ERRO_MINHA_FROTA = "Não encontramos veículos com esse telefone. Confira o número ou fale com a oficina."
 
 
-def cliente_confere(con, telefone: str, placa: str) -> bool:
-    """Verificação de quem pede a frota: a placa informada tem que ser do telefone informado.
-    Para trocar o método (código por WhatsApp, por exemplo), mude só aqui."""
-    return bool(telefone) and con.execute(
-        "SELECT 1 FROM clientes WHERE placa = ? AND telefone = ?", (placa, telefone)).fetchone() is not None
+def cliente_confere(con, telefone: str) -> bool:
+    """Verificação de quem pede a frota: hoje basta o telefone estar no cadastro da oficina
+    (vem no link da etiqueta, parâmetro t). Para trocar o método (código por WhatsApp, por exemplo),
+    mude só aqui."""
+    return bool(telefone) and con.execute("SELECT 1 FROM clientes WHERE telefone = ?", (telefone,)).fetchone() is not None
 
 
 def _cors(req: Request) -> dict[str, str]:
@@ -360,12 +360,12 @@ async def minha_frota(req: Request, resposta: Response):
     except HTTPException as e:
         raise HTTPException(e.status_code, e.detail, headers=cors)
     try:
-        dados = json.loads(await req.body())
-        telefone, placa = telefone_valido(str(dados["telefone"])), placa_valida(str(dados["placa"]))
+        # Só o telefone; "placa", se vier (versão anterior da página), é ignorada.
+        telefone = telefone_valido(str(json.loads(await req.body())["telefone"]))
     except (ValueError, KeyError, TypeError):
         raise HTTPException(404, ERRO_MINHA_FROTA, headers=cors)
     with db.transacao() as con:
-        if not cliente_confere(con, telefone, placa):
+        if not cliente_confere(con, telefone):
             raise HTTPException(404, ERRO_MINHA_FROTA, headers=cors)
         placas = [r["placa"] for r in con.execute("SELECT placa FROM clientes WHERE telefone = ? ORDER BY placa", (telefone,))]
     hoje = config.hoje()

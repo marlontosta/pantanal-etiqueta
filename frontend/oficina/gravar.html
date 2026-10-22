@@ -336,17 +336,30 @@ function montarLink() {
   }
   let base = $("base").value.trim() || CFG.paginaCliente;
   base = base.split("?")[0];
-  return base + (p.length ? "?" + p.join("&") : "");
+  const url = base + (p.length ? "?" + p.join("&") : "");
+  // Telefone do cliente (t, só os dígitos, sem o 55): a etiqueta abre "Minha frota" direto.
+  // Fica de fora se não couber na NTAG213, a etiqueta mais comum.
+  let tel = $("telefone").value.replace(/\D/g, "");
+  if ((tel.length === 12 || tel.length === 13) && tel.startsWith("55")) tel = tel.slice(2);
+  semTelefone = false;
+  if (tel.length !== 10 && tel.length !== 11) return url;
+  const comTel = url + (p.length ? "&" : "?") + "t=" + tel;
+  if (bytesNdef(comTel) > CHIPS[0][1] && bytesNdef(url) <= CHIPS[0][1]) { semTelefone = true; return url; }
+  return comTel;
 }
+
+// NDEF guarda "https://" em 1 byte, mais uns 7 bytes de cabeçalho
+const bytesNdef = url => new TextEncoder().encode(url.replace(/^https?:\/\/(www\.)?/, "")).length + 8;
+let semTelefone = false;
 
 function atualizar() {
   const url = montarLink();
   $("link").value = url;
   $("btnAbrir").href = url;
-  // NDEF guarda "https://" em 1 byte, mais uns 7 bytes de cabeçalho
-  const bytes = new TextEncoder().encode(url.replace(/^https?:\/\/(www\.)?/, "")).length + 8;
+  const bytes = bytesNdef(url);
   const cabe = CHIPS.filter(c => bytes <= c[1]).map(c => c[0]);
-  $("tamanho").textContent = bytes + " bytes. " + (cabe.length ? "Cabe em: " + cabe.join(", ") + "." : "Grande demais para as etiquetas comuns.");
+  $("tamanho").textContent = bytes + " bytes. " + (cabe.length ? "Cabe em: " + cabe.join(", ") + "." : "Grande demais para as etiquetas comuns.") +
+    (semTelefone ? " Sem o telefone do cliente no link, para caber na " + CHIPS[0][0] + " (a página do cliente fica sem as abas dos outros veículos)." : "");
   const ok = U.placa($("placa").value).length === 7;
   $("btnGravar").disabled = !ok;
   $("btnSalvar").disabled = !ok;
@@ -360,6 +373,7 @@ function carregar(url) {
   let p;
   try { p = new URL(url).searchParams; } catch (e) { aviso("bad", "Esse link não parece válido. Confira se ele começa com https://"); return; }
   $("placa").value = U.placa(p.get("p"));
+  if (p.get("t") && !$("telefone").value.trim()) $("telefone").value = fmtFone(p.get("t").replace(/\D/g, ""));
   for (const s of CFG.servicos) {
     const r = U.ler(p, s);
     $("km-" + s.id).value = fmtKm(U.km(r.km));

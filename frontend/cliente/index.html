@@ -18,7 +18,9 @@
     </nav>
   </header>
 
-  <section class="sticker" aria-labelledby="titulo">
+  <div class="abas" id="abas" role="tablist" aria-label="Veículos do cliente" hidden></div>
+
+  <section class="sticker" aria-labelledby="titulo" id="painel">
     <div class="top">
       <div class="kicker" id="titulo">Etiqueta digital de manutenção</div>
       <h1 class="plate" aria-label="Placa do veículo"><span id="placa">–</span></h1>
@@ -56,11 +58,6 @@
     <a class="btn" id="whats" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>Agendar pelo WhatsApp</a>
   </section>
 
-  <section class="sticker contact" id="frotaBox">
-    <div class="small">Tem mais de um veículo com a gente? Veja todos num lugar só.</div>
-    <a class="b" id="linkFrota" href="frota.html">Ver minha frota</a>
-  </section>
-
   <section class="sticker contact">
     <div class="small">Histórico e detalhes de todas as manutenções do veículo.</div>
     <a class="b primary" id="detalhes" href="#" target="_blank" rel="noopener">Ver detalhes no Sobre Rodas</a>
@@ -91,18 +88,22 @@ const TEXTO = { bad: "Vencida", warn: "Próxima", ok: "Em dia", none: "Sem regis
 // Exemplo mostrado quando a página é aberta sem os dados da etiqueta.
 const EXEMPLO = "p=ABC1D23&o=l3q.1rz&g=gtk.1ng&h=o";
 
-let params = new URLSearchParams(location.search);
-const temDados = params.get("p") || CFG.servicos.some(s => { const r = U.ler(params, s); return r.km || r.dt; });
-if (!temDados) params = new URLSearchParams(EXEMPLO);
+const daEtiqueta = new URLSearchParams(location.search);
+const temDados = daEtiqueta.get("p") || CFG.servicos.some(s => { const r = U.ler(daEtiqueta, s); return r.km || r.dt; });
 
-const placa = U.placa(params.get("p")) || "–";
-const registros = CFG.servicos.map(s => { const r = U.ler(params, s); return { ...s, ultKm: U.km(r.km), ultData: U.data(r.dt) }; });
-
-// Visita mais recente: maior km e data mais recente entre os serviços.
-const kms = registros.map(r => r.ultKm).filter(v => v != null);
-const datas = registros.map(r => r.ultData).filter(Boolean);
-const kmUltimo = kms.length ? Math.max(...kms) : 0;
-const dataUltima = datas.length ? new Date(Math.max(...datas)) : null;
+// Veículo mostrado: o da etiqueta ou, com abas, o escolhido. usar() troca tudo.
+let params, placa, registros, kms, kmUltimo, dataUltima;
+function usar(p) {
+  params = p;
+  placa = U.placa(params.get("p")) || "–";
+  registros = CFG.servicos.map(s => { const r = U.ler(params, s); return { ...s, ultKm: U.km(r.km), ultData: U.data(r.dt) }; });
+  // Visita mais recente: maior km e data mais recente entre os serviços.
+  kms = registros.map(r => r.ultKm).filter(v => v != null);
+  const datas = registros.map(r => r.ultData).filter(Boolean);
+  kmUltimo = kms.length ? Math.max(...kms) : 0;
+  dataUltima = datas.length ? new Date(Math.max(...datas)) : null;
+}
+usar(temDados ? daEtiqueta : new URLSearchParams(EXEMPLO));
 
 function calcular(kmAtual) {
   const m = CFG.margem;
@@ -206,26 +207,29 @@ $("insta").href = "https://www.instagram.com/" + of.instagram + "/";
 $("instaTxt").textContent = "@" + of.instagram;
 $("whatsTopo").href = "https://wa.me/" + of.whatsapp;
 $("foneTopo").textContent = U.fone(of.whatsapp);
-$("placa").textContent = placa;
 $("detalhes").href = CFG.sobreRodas.url;
 $("detalhes").textContent = "Ver detalhes no " + CFG.sobreRodas.nome;
 if (CFG.areaOficina) { $("linkOficina").href = CFG.areaOficina; $("linkOficina").hidden = false; }
-// Minha frota: já leva a placa desta etiqueta para o campo de verificação.
-if (CFG.minhaFrota) { if (temDados && placa !== "–") $("linkFrota").href = "frota.html?p=" + placa; } else $("frotaBox").hidden = true;
-$("ultData").textContent = dataUltima ? fmtData(dataUltima) : "–";
-$("ultKm").textContent = kms.length ? fmtKm(kmUltimo) + " km" : "–";
 if (!temDados) {
   $("aviso").hidden = false;
   $("aviso").textContent = "Exemplo de demonstração. Aproxime o celular da etiqueta NFC do veículo para ver os dados reais.";
 }
 
-let salvo = null;
-try { salvo = localStorage.getItem("km:" + placa); } catch (e) {}
-$("km").value = fmtKm(Math.max(Number(salvo) || 0, kmUltimo));
+// Dados do veículo mostrado: placa, última visita e o km guardado neste aparelho.
+function mostrarVeiculo() {
+  $("placa").textContent = placa;
+  $("ultData").textContent = dataUltima ? fmtData(dataUltima) : "–";
+  $("ultKm").textContent = kms.length ? fmtKm(kmUltimo) + " km" : "–";
+  let salvo = null;
+  try { salvo = localStorage.getItem("km:" + placa); } catch (e) {}
+  $("km").value = fmtKm(Math.max(Number(salvo) || 0, kmUltimo));
+  podeEnviar = Boolean(CFG.envioKm && temDados && /^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(placa));
+  render();
+}
 
 // Km digitado pelo cliente vai para a oficina, alguns segundos depois de parar de digitar.
 // Texto puro e sem ler a resposta: funciona também da página antiga no GitHub Pages, sem CORS.
-const podeEnviar = Boolean(CFG.envioKm && temDados && /^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(placa));
+let podeEnviar = false;
 let espera = null;
 function enviarKm() {
   clearTimeout(espera); espera = null;
@@ -247,7 +251,68 @@ $("km").addEventListener("input", e => {
 $("km").addEventListener("change", enviarKm);
 document.addEventListener("visibilitychange", () => { if (document.hidden && espera) enviarKm(); });
 
-render();
+mostrarVeiculo();
+
+// Abas: com o telefone do cliente no link (t), a página busca os outros veículos do mesmo telefone.
+// A aba de cada placa mostra os dados do sistema no mesmo formato da etiqueta; a da etiqueta lida
+// usa o próprio link e começa ativa.
+function linkDoVeiculo(v) {
+  const p = new URLSearchParams({ p: v.placa });
+  for (const s of CFG.servicos) {
+    const it = v.servicos.find(x => x.servico === s.id);
+    const cod = it ? U.codificar(it.ultimo_km, it.ultima_data) : "";
+    if (cod) p.set(s.c, cod);
+  }
+  return p;
+}
+
+function montarAbas(veiculos) {
+  const abas = $("abas");
+  const botoes = veiculos.map(v => {
+    const b = el("button", "aba", v.placa);
+    b.type = "button";
+    b.id = "aba-" + v.placa;
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-controls", "painel");
+    b.addEventListener("click", () => escolher(v));
+    return b;
+  });
+  const marcar = () => botoes.forEach(b => {
+    const ativa = b.textContent === placa;
+    b.setAttribute("aria-selected", ativa);
+    b.tabIndex = ativa ? 0 : -1;
+  });
+  function escolher(v) {
+    if (v.placa === placa) return;
+    if (espera) enviarKm();
+    usar(v.placa === U.placa(daEtiqueta.get("p")) ? daEtiqueta : linkDoVeiculo(v));
+    mostrarVeiculo();
+    marcar();
+    $("painel").setAttribute("aria-labelledby", "aba-" + v.placa);
+  }
+  // Setas trocam de aba, como nas abas do sistema.
+  abas.addEventListener("keydown", e => {
+    const i = botoes.indexOf(document.activeElement);
+    if (i < 0 || (e.key !== "ArrowRight" && e.key !== "ArrowLeft")) return;
+    const j = (i + (e.key === "ArrowRight" ? 1 : botoes.length - 1)) % botoes.length;
+    botoes[j].focus(); botoes[j].click();
+  });
+  abas.replaceChildren(...botoes);
+  marcar();
+  abas.hidden = false;
+  $("painel").setAttribute("aria-labelledby", "aba-" + placa);
+  botoes.find(b => b.textContent === placa).scrollIntoView({ block: "nearest", inline: "center" });
+}
+
+const telefone = (daEtiqueta.get("t") || "").replace(/\D/g, "");
+if (CFG.minhaFrota && temDados && telefone.length >= 10) {
+  fetch(CFG.minhaFrota, { method: "POST", body: JSON.stringify({ telefone }) })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      // Só com mais de um veículo, e se a placa da etiqueta for mesmo desse telefone.
+      if (d && d.veiculos.length > 1 && d.veiculos.some(v => v.placa === placa)) montarAbas(d.veiculos);
+    }, () => {});
+}
 </script>
 </body>
 </html>

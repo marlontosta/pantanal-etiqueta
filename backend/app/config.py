@@ -14,7 +14,7 @@ OS_TAMANHO_MAXIMO = 10 * 1024 * 1024
 # Cookie só por https em produção; em http local precisa ser 0.
 COOKIE_SEGURO = os.environ.get("PANTANAL_COOKIE_SEGURO", "1") != "0"
 SESSAO_DIAS = int(os.environ.get("PANTANAL_SESSAO_DIAS", "30"))
-# Sites que podem ler a resposta de "minha frota" (a página do cliente no GitHub Pages), separados por vírgula.
+# Sites que podem ler a lista de veículos do cliente (a página da etiqueta no GitHub Pages), separados por vírgula.
 ORIGENS_CLIENTE = [o.strip() for o in os.environ.get("PANTANAL_ORIGENS_CLIENTE", "https://marlontosta.github.io").split(",") if o.strip()]
 # Primeiro acesso em hospedagens sem terminal: cria este usuário se o banco não tiver nenhum.
 USUARIO_INICIAL = os.environ.get("PANTANAL_USUARIO")

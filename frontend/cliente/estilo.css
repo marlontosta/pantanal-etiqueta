@@ -114,14 +114,12 @@ h1 { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.05; text-wra
 .foot-links { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .foot-links a { color: var(--accent); }
 
-/* Minha frota (página do cliente) */
-.minha-form { display: grid; gap: 12px; }
-.frota-cli { display: grid; gap: 16px; }
-.frota-cli:empty, .summary[hidden], .contact[hidden] { display: none; }
-.frota-cli .plate span { font-size: 1.6rem; }
-.row1 h3 { margin: 0; font: 600 1.2rem var(--display); }
-.fato-sub { display: block; font: 500 .78rem var(--body); color: var(--muted); }
-@media (max-width: 420px) { .minha-form .grid2 { grid-template-columns: 1fr; } }
+/* Abas com os veículos do mesmo cliente (telefone) */
+.abas { display: flex; gap: 6px; overflow-x: auto; padding: 2px; scrollbar-width: thin; }
+.abas[hidden] { display: none; }
+.aba { flex: none; font: 700 1.05rem var(--display); letter-spacing: .08em; padding: 7px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--sticker); color: var(--muted); cursor: pointer; }
+.aba[aria-selected="true"] { background: var(--brand-black); color: var(--brand); border-color: var(--brand); }
+.aba:focus-visible { outline: 3px solid var(--brand); outline-offset: 1px; }
 
 /* Tela de gravação */
 .card { background: var(--sticker); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; }

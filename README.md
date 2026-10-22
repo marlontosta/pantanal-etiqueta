@@ -14,7 +14,6 @@ etiqueta/
 ├── frontend/
 │   ├── cliente/         ← página do cliente, publicada no GitHub Pages
 │   │   ├── index.html   lê os parâmetros do link da etiqueta
-│   │   ├── frota.html   "Minha frota": o cliente vê todos os carros dele (telefone + placa)
 │   │   ├── config.js    oficina, serviços, intervalos e margens (edite só aqui)
 │   │   ├── estilo.css   visual de todas as páginas
 │   │   └── logo.png
@@ -50,6 +49,7 @@ https://marlontosta.github.io/pantanal-etiqueta/?p=LMV4G22&o=21fu.1wv&r=o&g=o
 | `r`       | Revisão mecânica (suspensão, freios e demais itens)      |
 | `g`       | Geometria (alinhamento e balanceamento)                  |
 | `h`       | Higienização do ar-condicionado                          |
+| `t`       | Telefone do cliente (só dígitos, sem o 55): abas com os outros veículos dele |
 
 Cada serviço vale `KM.DIA`, os dois em base 36: km rodado e dias desde 01/01/2020.
 `21fu.1wv` é 95.178 km em 15/10/2026. `KM.` guarda só o km e `.DIA` só a data.
@@ -59,6 +59,8 @@ que é o caso comum de vários serviços feitos na mesma visita.
 - A área da oficina monta esse formato sozinha; não é preciso calcular à mão.
 - Qualquer serviço pode faltar; ele aparece como "Sem registro".
 - Sem nenhum parâmetro, `index.html` mostra um exemplo de demonstração.
+- `t` entra quando o telefone do cliente está preenchido na tela de visita. Se com ele o link não
+  couber na NTAG213, ele fica de fora (a tela avisa) e a etiqueta funciona como antes, sem abas.
 
 As letras, intervalos (km e meses) e margens de aviso ficam em `frontend/cliente/config.js`.
 Se mudar um intervalo, mude também em `backend/app/config.py` (um teste avisa se ficarem diferentes).
@@ -90,7 +92,7 @@ Testes: `pip install -r requirements-dev.txt && python -m pytest`.
 | `PANTANAL_SESSAO_DIAS`    | `30`                         | quantos dias o login dura                         |
 | `PANTANAL_ARQUIVOS_OS`    | pasta `os` ao lado do banco  | onde ficam os PDFs das OS                         |
 | `PANTANAL_USUARIO` / `PANTANAL_SENHA` | –                | cria esse usuário na primeira vez, se o banco não tiver nenhum (para hospedagens sem terminal) |
-| `PANTANAL_ORIGENS_CLIENTE` | `https://marlontosta.github.io` | sites (separados por vírgula) que podem ler a resposta de "Minha frota" |
+| `PANTANAL_ORIGENS_CLIENTE` | `https://marlontosta.github.io` | sites (separados por vírgula) que podem ler a lista de veículos do cliente (abas da etiqueta) |
 
 ### Usuários
 
@@ -147,22 +149,21 @@ A resposta é sempre `{"ok": true}`, guardando ou não, para ninguém descobrir 
 pelo navegador; o motivo do descarte vai para o log do servidor ("km do cliente descartado").
 Km de placa que ainda não tem visita fica guardado e entra quando ela tiver.
 
-### Minha frota (página do cliente)
+### Veículos do mesmo cliente (abas na etiqueta)
 
-A página do cliente tem o botão "Ver minha frota", que abre `frota.html` (no GitHub Pages e no
-backend). O cliente informa o telefone (qualquer formato; vale com ou sem o 55) e a placa de um
-dos carros dele, como verificação. Se a placa estiver cadastrada com aquele telefone na tabela
-`clientes`, a página mostra um cartão para cada placa com o mesmo telefone: última visita, km na
-visita, km atual (estimado, informado pelo cliente ou pela oficina), km/dia e a próxima manutenção
-de cada serviço, com o link para a etiqueta digital daquele carro. Nome, telefone e PDFs das OS
-não são enviados. Telefone e placa ficam guardados no aparelho (`localStorage`) para não digitar de
-novo; "Usar outro telefone" apaga.
+Quando o link da etiqueta tem o telefone do cliente (`t`), a página do cliente busca os outros
+veículos com o mesmo telefone (tabela `clientes`) e, se houver mais de um, mostra uma aba por placa
+acima da etiqueta. A aba da placa lida começa ativa e usa os dados do próprio link; as outras usam
+os dados do sistema no mesmo formato (última visita e km de cada serviço) e funcionam igual: km
+atual, previsões, envio do km e WhatsApp. Sem `t`, sem resposta ou com um veículo só, não aparecem
+abas. Nome, telefone e PDFs das OS não são enviados.
 
-- Telefone e placa que não conferem (ou dados inválidos) dão sempre a mesma mensagem.
-- Cada endereço IP pode consultar 10 vezes a cada 15 minutos.
-- A verificação fica numa função só (`cliente_confere` em `backend/app/main.py`): para trocar o
-  método (código pelo WhatsApp, por exemplo), mude só ela.
-- O endereço da consulta é `minhaFrota` no `config.js`; vazio esconde o botão. A página no GitHub
+- A identificação é só o telefone (`cliente_confere` em `backend/app/main.py`, que hoje só confere
+  se o telefone está no cadastro). Para trocar o método (código pelo WhatsApp, por exemplo), mude
+  só ela.
+- Telefone fora do cadastro ou dados inválidos dão sempre a mesma mensagem; cada endereço IP pode
+  consultar 10 vezes a cada 15 minutos.
+- O endereço da consulta é `minhaFrota` no `config.js`; vazio desliga as abas. A página no GitHub
   Pages lê a resposta porque o backend manda `Access-Control-Allow-Origin` para os sites de
   `PANTANAL_ORIGENS_CLIENTE`; o pedido vai em texto puro, sem preflight de CORS.
 
@@ -202,7 +203,7 @@ e "Registrar nova visita".
 | `GET /api/ordens/{id}`     | abre o PDF de uma OS                        |
 | `POST /api/leituras`       | `{placa, km}` do cliente, sem login, em texto puro; sempre `{ok: true}` |
 | `POST /api/veiculos/{placa}/km` | `{km}` km atual informado pela oficina   |
-| `POST /api/minha-frota`    | `{telefone, placa}` sem login, em texto puro → carros do telefone (sem nome/telefone/OS) |
+| `POST /api/minha-frota`    | `{telefone}` sem login, em texto puro → veículos desse telefone (sem nome/telefone/OS) |
 | `GET /api/frota`           | resumo de todas as placas                  |
 | `GET /api/veiculos/{placa}`| resumo e histórico de uma placa            |
 
