@@ -29,12 +29,14 @@ CREATE TABLE IF NOT EXISTS registros (
   UNIQUE (placa, servico, data)
 );
 CREATE INDEX IF NOT EXISTS registros_placa ON registros (placa, data);
--- Km que o cliente digitou na página da etiqueta. Um por placa e dia; vale o último digitado.
+-- Km que o cliente digitou na página da etiqueta, ou que a oficina informou na tela de frota
+-- (origem 'oficina'). Um por placa e dia; vale o último, mas o do cliente não troca o da oficina.
 CREATE TABLE IF NOT EXISTS leituras_cliente (
   id INTEGER PRIMARY KEY,
   placa TEXT NOT NULL,
   km INTEGER NOT NULL,
   data TEXT NOT NULL,
+  origem TEXT NOT NULL DEFAULT 'cliente',
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (placa, data)
 );
@@ -83,3 +85,6 @@ def transacao():
 def criar_tabelas() -> None:
     with transacao() as con:
         con.executescript(ESQUEMA)
+        # Bancos criados antes da coluna origem.
+        if "origem" not in {c["name"] for c in con.execute("PRAGMA table_info(leituras_cliente)")}:
+            con.execute("ALTER TABLE leituras_cliente ADD COLUMN origem TEXT NOT NULL DEFAULT 'cliente'")

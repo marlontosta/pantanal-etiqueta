@@ -231,9 +231,34 @@ async def salvar_leitura(req: Request):
         raise HTTPException(422, "Km não confere com as visitas.")
     with db.transacao() as con:
         con.execute("INSERT INTO leituras_cliente (placa, km, data) VALUES (?, ?, ?)"
-                    " ON CONFLICT (placa, data) DO UPDATE SET km = excluded.km, criado_em = datetime('now')",
+                    " ON CONFLICT (placa, data) DO UPDATE SET km = excluded.km, criado_em = datetime('now')"
+                    " WHERE origem = 'cliente'",
                     (lt.placa, lt.km, hoje.isoformat()))
     return {"ok": True}
+
+
+# Km atual informado pela oficina na tela de frota (por exemplo, quando o cliente liga ou passa na loja).
+
+class KmAtual(BaseModel):
+    km: int = Field(ge=1, le=9_999_999)
+
+
+@app.post("/api/veiculos/{placa}/km")
+def atualizar_km(placa: str, dados: KmAtual, u=Depends(usuario_logado)):
+    placa = re.sub(r"[^A-Z0-9]", "", placa.upper())
+    regs = _registros(placa)
+    if not regs:
+        raise HTTPException(404, "Placa sem registros.")
+    hoje = config.hoje()
+    if not frota.leituras_validas(regs, [{"km": dados.km, "data": hoje.isoformat()}])[0]["usada"]:
+        ult = max((r for r in regs if r["km"] is not None), key=lambda r: (r["data"], r["km"]), default=None)
+        raise HTTPException(422, "Km não confere com as visitas" +
+                            (f" (última: {ult['km']:,} km em {date.fromisoformat(ult['data']):%d/%m/%Y})".replace(",", ".") if ult else "") + ".")
+    with db.transacao() as con:
+        con.execute("INSERT INTO leituras_cliente (placa, km, data, origem) VALUES (?, ?, ?, 'oficina')"
+                    " ON CONFLICT (placa, data) DO UPDATE SET km = excluded.km, origem = 'oficina', criado_em = datetime('now')",
+                    (placa, dados.km, hoje.isoformat()))
+    return {"placa": placa, "km": dados.km}
 
 
 def _registros(placa: str | None = None) -> list[dict]:
@@ -245,7 +270,7 @@ def _registros(placa: str | None = None) -> list[dict]:
 
 
 def _leituras(placa: str | None = None) -> list[dict]:
-    sql, args = "SELECT placa, km, data FROM leituras_cliente", ()
+    sql, args = "SELECT placa, km, data, origem FROM leituras_cliente", ()
     if placa:
         sql, args = sql + " WHERE placa = ?", (placa,)
     with db.transacao() as con:

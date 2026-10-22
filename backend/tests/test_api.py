@@ -99,10 +99,27 @@ def test_km_do_cliente(cliente, logado):
     assert [c["placa"] for c in v] == ["LMV4G22"]
     assert v[0]["km_referencia"] == 92500 and v[0]["km_do_cliente"] and v[0]["km_por_dia"] == 50.0
     det = logado.get("/api/veiculos/LMV4G22").json()
-    assert det["leituras"] == [{"placa": "LMV4G22", "km": 92500, "data": config.hoje().isoformat(), "usada": True}]
+    assert det["leituras"] == [{"placa": "LMV4G22", "km": 92500, "data": config.hoje().isoformat(), "origem": "cliente", "usada": True}]
 
 
 def test_limite_de_envios(cliente):
     for _ in range(30):
         cliente.post("/api/leituras", content='{"placa":"QWE1R23","km":5000}')
     assert cliente.post("/api/leituras", content='{"placa":"QWE1R23","km":5000}').status_code == 429
+
+
+def test_km_atual_pela_oficina(cliente, logado):
+    antes = (config.hoje() - timedelta(days=50)).isoformat()
+    logado.post("/api/registros", json={"placa": "LMV4G22", "servicos": [{"servico": "oleo", "km": 90000, "data": antes}]})
+    assert logado.post("/api/veiculos/LMV4G22/km", json={"km": 80000}).status_code == 422  # menor que a visita
+    assert logado.post("/api/veiculos/ZZZ9Z99/km", json={"km": 1000}).status_code == 404
+    assert logado.post("/api/veiculos/lmv-4g22/km", json={"km": 92500}).status_code == 200
+    carro = logado.get("/api/frota").json()["veiculos"][0]
+    assert carro["km_referencia"] == 92500 and carro["km_da_oficina"] and not carro["km_do_cliente"]
+    assert carro["km_por_dia"] == 50.0
+    # O cliente digitando no mesmo dia não troca o km da oficina.
+    cliente.post("/api/leituras", content='{"placa":"LMV4G22","km":92600}')
+    det = logado.get("/api/veiculos/LMV4G22").json()
+    assert [(l["km"], l["origem"]) for l in det["leituras"]] == [(92500, "oficina")]
+    logado.post("/api/sair")
+    assert cliente.post("/api/veiculos/LMV4G22/km", json={"km": 93000}).status_code == 401

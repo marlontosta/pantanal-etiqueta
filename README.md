@@ -149,6 +149,9 @@ a tela de visita com o carro carregado, direto na gravação) e "Registrar nova 
 - **Km atual**: último km conhecido + km/dia × dias desde então (marcado "est." quando
   estimado, e "cliente" quando o último km veio do cliente). "Km na visita" é sempre o da oficina.
 - O detalhe da placa lista os km informados pelo cliente, marcando os ignorados.
+- **Km atual hoje**: no lápis ✎ da coluna "Km atual", a oficina pode informar o km do dia (cliente ligou ou
+  passou na loja). Entra na estimativa como o km do cliente, com a marca "oficina", e precisa bater
+  com as visitas. O km que o cliente digitar no mesmo dia não troca o da oficina.
 - **Previsão** de cada serviço: a data mais próxima entre o prazo em meses e o dia em que o km
   estimado chega no km da próxima troca. A situação segue as mesmas regras da página do cliente.
 - Com "Serviço" escolhido, as colunas de previsão mostram aquele serviço em vez do mais urgente.

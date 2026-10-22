@@ -50,7 +50,7 @@
   </div>
 
   <footer class="small legend">
-    <div>Km/dia é a média entre o primeiro e o último km conhecido (com pelo menos 7 dias entre eles). Contam os km das visitas e os que o cliente digita na página da etiqueta. Km atual é o último km mais essa média vezes os dias desde então (marcado "est."); "cliente" quer dizer que o último km veio do cliente.</div>
+    <div>Km/dia é a média entre o primeiro e o último km conhecido (com pelo menos 7 dias entre eles). Contam os km das visitas e os que o cliente digita na página da etiqueta. Km atual é o último km mais essa média vezes os dias desde então (marcado "est."); "cliente" ou "oficina" quer dizer que o último km veio do cliente ou foi informado aqui, no lápis ✎ da coluna Km atual.</div>
     <div>Previsão é a data mais próxima entre o prazo em meses e o dia estimado em que o carro chega no km da próxima troca. Clique numa linha para ver todos os serviços e o histórico.</div>
   </footer>
 </main>
@@ -79,14 +79,16 @@ const COLS = [
   { k: "kmvisita", t: "Km na visita", n: 1, v: x => x.v.ultimo_km, f: x => fmtKm(x.v.ultimo_km) },
   { k: "kmdia", t: "Km/dia", n: 1, v: x => x.v.km_por_dia, f: x => x.v.km_por_dia == null ? "–" : x.v.km_por_dia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) },
   { k: "kmatual", t: "Km atual", n: 1, v: x => x.v.km_atual, f: x => {
-      const s = el("span", null, fmtKm(x.v.km_atual));
-      if (x.v.km_estimado) s.append(" ", el("span", "est", "est."));
-      if (x.v.km_do_cliente) {
-        const c = el("span", "est cli", "cliente");
-        c.title = "Base: " + fmtKm(x.v.km_referencia) + " km informados pelo cliente em " + fmtData(x.v.km_referencia_data);
-        s.append(" ", c);
+      // Marcas ("est.", "cliente", "oficina") numa segunda linha, para a coluna não alargar.
+      const marcas = el("span", "km-marcas");
+      if (x.v.km_estimado) marcas.append(el("span", "est", "est."));
+      if (x.v.km_do_cliente || x.v.km_da_oficina) {
+        const quem = x.v.km_da_oficina ? "oficina" : "cliente";
+        const c = el("span", "est cli", quem);
+        c.title = "Base: " + fmtKm(x.v.km_referencia) + " km informados " + (x.v.km_da_oficina ? "pela oficina" : "pelo cliente") + " em " + fmtData(x.v.km_referencia_data);
+        marcas.append(marcas.childElementCount ? " " : "", c);
       }
-      return s;
+      return celulaKm(x.v, fmtKm(x.v.km_atual), marcas);
     } },
   { k: "servico", t: "Próxima manutenção", w: 1, v: x => x.s?.nome, f: x => x.s?.nome || "–" },
   { k: "previsao", t: "Previsão", v: x => x.s?.proxima_data, f: x => fmtData(x.s?.proxima_data) },
@@ -256,11 +258,66 @@ function detalhe(v) {
     for (const r of d.historico) (porData[r.data] ||= { km: r.km, itens: [] }).itens.push(nomes[r.servico] || r.servico);
     hist.textContent = "Histórico: " + Object.entries(porData).map(([dt, x]) =>
       fmtData(dt) + (x.km != null ? " (" + fmtKm(x.km) + " km)" : "") + ": " + x.itens.join(", ")).join(" · ");
-    // Km que o cliente digitou na página da etiqueta; os que não batem com as visitas ficam fora da conta.
-    if (d.leituras.length) leit.textContent = "Km informado pelo cliente: " + d.leituras.map(l =>
-      fmtData(l.data) + " " + fmtKm(l.km) + " km" + (l.usada ? "" : " (ignorado, não bate com as visitas)")).join(" · ");
+    // Km que o cliente digitou na página da etiqueta ou a oficina informou aqui; os que não batem com as visitas ficam fora da conta.
+    if (d.leituras.length) leit.textContent = "Km informado fora das visitas: " + d.leituras.map(l =>
+      fmtData(l.data) + " " + fmtKm(l.km) + " km (" + (l.origem === "oficina" ? "oficina" : "cliente") + ")" +
+      (l.usada ? "" : " (ignorado, não bate com as visitas)")).join(" · ");
   }).catch(e => { hist.textContent = "Não carregou o histórico: " + e.message; });
   return tr;
+}
+
+// Km atual informado pela oficina (cliente ligou, passou na loja…), na própria coluna "Km atual":
+// o lápis troca o valor por um campo; Enter salva, Esc cancela. Entra na estimativa como o km do cliente.
+function celulaKm(v, km, marcas) {
+  const box = el("span", "kmcel");
+  const lapis = el("button", "kmedit", "✎");
+  lapis.type = "button";
+  lapis.title = lapis.ariaLabel = "Atualizar km atual da placa " + v.placa;
+  lapis.addEventListener("click", e => {
+    e.stopPropagation();
+    box.replaceChildren(formKm(v, mostrar));
+    box.querySelector("input").focus();
+  });
+  // Enter/espaço no lápis abre o campo, não a linha.
+  lapis.addEventListener("keydown", e => e.stopPropagation());
+  // Primeira linha: o km. Segunda, em letra pequena: as marcas e o lápis.
+  marcas.append(marcas.childElementCount ? " " : "", lapis);
+  const valor = el("span", "km-valor", km);
+  const mostrar = () => box.replaceChildren(valor, marcas);
+  mostrar();
+  return box;
+}
+
+function formKm(v, voltar) {
+  const f = el("form", "kmatual");
+  const inp = el("input");
+  inp.ariaLabel = "Km atual hoje da placa " + v.placa;
+  inp.inputMode = "numeric"; inp.autocomplete = "off";
+  inp.placeholder = v.km_atual != null ? fmtKm(v.km_atual) : "km";
+  inp.addEventListener("input", () => { const n = window.ETQ.km(inp.value); inp.value = n == null ? "" : fmtKm(Math.min(n, 9999999)); });
+  const ok = el("button", "kmedit", "✓");
+  ok.type = "submit"; ok.title = ok.ariaLabel = "Salvar km";
+  const x = el("button", "kmedit", "✕");
+  x.type = "button"; x.title = x.ariaLabel = "Cancelar";
+  x.addEventListener("click", voltar);
+  const msg = el("span", "kmmsg");
+  f.append(inp, ok, x, msg);
+  // Clique e teclas no campo não abrem nem fecham a linha.
+  f.addEventListener("click", e => e.stopPropagation());
+  f.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") voltar(); });
+  f.addEventListener("submit", async e => {
+    e.preventDefault();
+    const km = window.ETQ.km(inp.value);
+    if (!km) { msg.textContent = "Digite o km."; return; }
+    ok.disabled = true; msg.textContent = "Salvando…";
+    try {
+      await OFICINA.api("/api/veiculos/" + v.placa + "/km", { method: "POST", body: JSON.stringify({ km }) });
+      const d = await OFICINA.api("/api/frota");
+      veiculos = d.veiculos; hoje = d.hoje;
+      render();
+    } catch (err) { msg.textContent = err.message; ok.disabled = false; inp.focus(); }
+  });
+  return f;
 }
 
 const CFG = window.ETIQUETA;
