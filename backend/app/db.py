@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS clientes (
   telefone TEXT NOT NULL DEFAULT '',
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS clientes_telefone ON clientes (telefone);
 -- PDF da OS de uma visita. O arquivo fica em config.ARQUIVOS_OS com o nome igual ao sha256 do conteúdo.
 CREATE TABLE IF NOT EXISTS ordens (
   id INTEGER PRIMARY KEY,

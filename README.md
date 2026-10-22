@@ -14,6 +14,7 @@ etiqueta/
 ├── frontend/
 │   ├── cliente/         ← página do cliente, publicada no GitHub Pages
 │   │   ├── index.html   lê os parâmetros do link da etiqueta
+│   │   ├── frota.html   "Minha frota": o cliente vê todos os carros dele (telefone + placa)
 │   │   ├── config.js    oficina, serviços, intervalos e margens (edite só aqui)
 │   │   ├── estilo.css   visual de todas as páginas
 │   │   └── logo.png
@@ -89,6 +90,7 @@ Testes: `pip install -r requirements-dev.txt && python -m pytest`.
 | `PANTANAL_SESSAO_DIAS`    | `30`                         | quantos dias o login dura                         |
 | `PANTANAL_ARQUIVOS_OS`    | pasta `os` ao lado do banco  | onde ficam os PDFs das OS                         |
 | `PANTANAL_USUARIO` / `PANTANAL_SENHA` | –                | cria esse usuário na primeira vez, se o banco não tiver nenhum (para hospedagens sem terminal) |
+| `PANTANAL_ORIGENS_CLIENTE` | `https://marlontosta.github.io` | sites (separados por vírgula) que podem ler a resposta de "Minha frota" |
 
 ### Usuários
 
@@ -145,6 +147,25 @@ A resposta é sempre `{"ok": true}`, guardando ou não, para ninguém descobrir 
 pelo navegador; o motivo do descarte vai para o log do servidor ("km do cliente descartado").
 Km de placa que ainda não tem visita fica guardado e entra quando ela tiver.
 
+### Minha frota (página do cliente)
+
+A página do cliente tem o botão "Ver minha frota", que abre `frota.html` (no GitHub Pages e no
+backend). O cliente informa o telefone (qualquer formato; vale com ou sem o 55) e a placa de um
+dos carros dele, como verificação. Se a placa estiver cadastrada com aquele telefone na tabela
+`clientes`, a página mostra um cartão para cada placa com o mesmo telefone: última visita, km na
+visita, km atual (estimado, informado pelo cliente ou pela oficina), km/dia e a próxima manutenção
+de cada serviço, com o link para a etiqueta digital daquele carro. Nome, telefone e PDFs das OS
+não são enviados. Telefone e placa ficam guardados no aparelho (`localStorage`) para não digitar de
+novo; "Usar outro telefone" apaga.
+
+- Telefone e placa que não conferem (ou dados inválidos) dão sempre a mesma mensagem.
+- Cada endereço IP pode consultar 10 vezes a cada 15 minutos.
+- A verificação fica numa função só (`cliente_confere` em `backend/app/main.py`): para trocar o
+  método (código pelo WhatsApp, por exemplo), mude só ela.
+- O endereço da consulta é `minhaFrota` no `config.js`; vazio esconde o botão. A página no GitHub
+  Pages lê a resposta porque o backend manda `Access-Control-Allow-Origin` para os sites de
+  `PANTANAL_ORIGENS_CLIENTE`; o pedido vai em texto puro, sem preflight de CORS.
+
 ### Tela de frota
 
 Uma linha por placa, com última visita, km na visita, km/dia, km atual, próxima manutenção,
@@ -181,6 +202,7 @@ e "Registrar nova visita".
 | `GET /api/ordens/{id}`     | abre o PDF de uma OS                        |
 | `POST /api/leituras`       | `{placa, km}` do cliente, sem login, em texto puro; sempre `{ok: true}` |
 | `POST /api/veiculos/{placa}/km` | `{km}` km atual informado pela oficina   |
+| `POST /api/minha-frota`    | `{telefone, placa}` sem login, em texto puro → carros do telefone (sem nome/telefone/OS) |
 | `GET /api/frota`           | resumo de todas as placas                  |
 | `GET /api/veiculos/{placa}`| resumo e histórico de uma placa            |
 

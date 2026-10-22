@@ -206,9 +206,11 @@ class Leitura(BaseModel):
     _placa = field_validator("placa")(placa_valida)
 
 
-# Por IP: limite de envios numa janela, para ninguém encher o banco.
+# Por IP: limite de envios numa janela, para ninguém encher o banco nem testar telefones.
 _envios: dict[str, list[float]] = {}
 MAX_ENVIOS, JANELA_ENVIOS = 30, 3600
+_consultas: dict[str, list[float]] = {}
+MAX_CONSULTAS, JANELA_CONSULTAS = 10, 15 * 60
 # Km do cliente guardados por placa; os mais antigos saem.
 MAX_LEITURAS_CLIENTE = 60
 
@@ -328,6 +330,62 @@ def ver_veiculo(placa: str, u=Depends(usuario_logado)):
     resumo = frota.resumo_veiculo(placa, regs, config.hoje(), leituras) if regs else {"placa": placa, "servicos": []}
     return {**resumo, "cliente": cliente or SEM_CLIENTE, "ordens": ordens, "historico": regs[::-1],
             "leituras": frota.leituras_validas(regs, leituras)[::-1]}
+
+
+# Minha frota: o cliente vê os carros do telefone dele na página pública (frontend/cliente/frota.html).
+# Texto puro, como /api/leituras, para a página no GitHub Pages não precisar de preflight de CORS;
+# o cabeçalho Access-Control-Allow-Origin deixa essa página ler a resposta.
+
+ERRO_MINHA_FROTA = "Não encontramos veículos com esse telefone e essa placa. Confira os dados ou fale com a oficina."
+
+
+def cliente_confere(con, telefone: str, placa: str) -> bool:
+    """Verificação de quem pede a frota: a placa informada tem que ser do telefone informado.
+    Para trocar o método (código por WhatsApp, por exemplo), mude só aqui."""
+    return bool(telefone) and con.execute(
+        "SELECT 1 FROM clientes WHERE placa = ? AND telefone = ?", (placa, telefone)).fetchone() is not None
+
+
+def _cors(req: Request) -> dict[str, str]:
+    origem = req.headers.get("origin")
+    return {"Access-Control-Allow-Origin": origem, "Vary": "Origin"} if origem in config.ORIGENS_CLIENTE else {"Vary": "Origin"}
+
+
+@app.post("/api/minha-frota")
+async def minha_frota(req: Request, resposta: Response):
+    cors = _cors(req)
+    resposta.headers.update(cors)
+    try:
+        _limite(_consultas, _ip(req), MAX_CONSULTAS, JANELA_CONSULTAS)
+    except HTTPException as e:
+        raise HTTPException(e.status_code, e.detail, headers=cors)
+    try:
+        dados = json.loads(await req.body())
+        telefone, placa = telefone_valido(str(dados["telefone"])), placa_valida(str(dados["placa"]))
+    except (ValueError, KeyError, TypeError):
+        raise HTTPException(404, ERRO_MINHA_FROTA, headers=cors)
+    with db.transacao() as con:
+        if not cliente_confere(con, telefone, placa):
+            raise HTTPException(404, ERRO_MINHA_FROTA, headers=cors)
+        placas = [r["placa"] for r in con.execute("SELECT placa FROM clientes WHERE telefone = ? ORDER BY placa", (telefone,))]
+    hoje = config.hoje()
+    veiculos = []
+    for p in placas:
+        regs = _registros(p)
+        if not regs:
+            veiculos.append({"placa": p, "ultima_visita": None, "ultimo_km": None, "km_atual": None, "origem_km": None,
+                             "km_por_dia": None, "servicos": []})
+            continue
+        r = frota.resumo_veiculo(p, regs, hoje, _leituras(p))
+        origem = ("oficina" if r["km_da_oficina"] else "cliente" if r["km_do_cliente"] else "visita")
+        # Só o que a página do cliente precisa: nada de nome, telefone ou OS.
+        veiculos.append({
+            "placa": p, "ultima_visita": r["ultima_visita"], "ultimo_km": r["ultimo_km"], "km_atual": r["km_atual"],
+            "origem_km": "estimado" if r["km_estimado"] else origem, "km_por_dia": r["km_por_dia"],
+            "servicos": [{k: s[k] for k in ("servico", "nome", "ultima_data", "ultimo_km", "proximo_km", "falta_km",
+                                            "proxima_data", "falta_dias", "status")} for s in r["servicos"]],
+        })
+    return {"hoje": hoje.isoformat(), "veiculos": veiculos}
 
 
 # Páginas da oficina: tudo menos a tela de login exige sessão.

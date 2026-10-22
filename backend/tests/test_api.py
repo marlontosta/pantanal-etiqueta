@@ -160,3 +160,31 @@ def test_km_do_cliente_guarda_so_os_ultimos(cliente, logado):
         datas = [r["data"] for r in con.execute("SELECT data FROM leituras_cliente WHERE placa = 'QWE1R23' ORDER BY data")]
     assert len(datas) == main.MAX_LEITURAS_CLIENTE and datas[-1] == config.hoje().isoformat()
 
+
+def test_minha_frota(cliente, logado):
+    antes = (config.hoje() - timedelta(days=50)).isoformat()
+    for placa, tel in (("LMV4G22", "(67) 99123-4567"), ("ABC1D23", "+55 67 99123 4567"), ("QWE1R23", "67988887777")):
+        logado.post("/api/registros", json={"placa": placa, "nome": "Fulano", "telefone": tel,
+                                            "servicos": [{"servico": "oleo", "km": 90000, "data": antes}]})
+    logado.post("/api/veiculos/LMV4G22/km", json={"km": 92500})
+    logado.post("/api/sair")
+    pede = lambda tel, placa, **kw: cliente.post("/api/minha-frota", content='{"telefone":"%s","placa":"%s"}' % (tel, placa), **kw)
+    r = pede("67 99123-4567", "abc-1d23", headers={"origin": "https://marlontosta.github.io"})
+    assert r.status_code == 200 and r.headers["access-control-allow-origin"] == "https://marlontosta.github.io"
+    v = r.json()["veiculos"]
+    assert [c["placa"] for c in v] == ["ABC1D23", "LMV4G22"]
+    assert v[1]["km_atual"] == 92500 and v[1]["origem_km"] == "oficina" and v[0]["origem_km"] == "visita"
+    assert v[0]["servicos"][0]["servico"] == "oleo" and v[0]["servicos"][0]["proximo_km"] == 100000
+    # Nada de nome, telefone ou OS.
+    assert "Fulano" not in r.text and "99123" not in r.text and "ordens" not in r.text
+    # Placa de outro telefone, telefone errado ou dados inválidos: o mesmo erro.
+    erros = [pede("67991234567", "QWE1R23"), pede("67900000000", "LMV4G22"), pede("", "LMV4G22"), pede("x", "y"),
+             cliente.post("/api/minha-frota", content="lixo")]
+    assert {e.status_code for e in erros} == {404} and len({e.json()["detail"] for e in erros}) == 1
+    # Outro site não lê a resposta.
+    assert "access-control-allow-origin" not in pede("67991234567", "LMV4G22", headers={"origin": "https://outro.com"}).headers
+    # Limite por IP: 10 consultas em 15 minutos (7 já foram).
+    for _ in range(3):
+        assert pede("67991234567", "LMV4G22").status_code == 200
+    r = pede("67991234567", "LMV4G22", headers={"origin": "https://marlontosta.github.io"})
+    assert r.status_code == 429 and r.headers["access-control-allow-origin"] == "https://marlontosta.github.io"

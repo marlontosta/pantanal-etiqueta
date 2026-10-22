@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Minha frota</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="brandbar">
+    <img src="logo.png" alt="Pantanal Pneus &amp; Serviços Automotivos" width="150" height="52">
+    <nav class="brandlinks" aria-label="Contato da oficina">
+      <a id="insta" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.8.1 3.3.1 4.8 1.7 4.9 4.9.1 1.3.1 1.6.1 4.8s0 3.6-.1 4.8c-.1 3.2-1.7 4.8-4.9 4.9-1.3.1-1.6.1-4.8.1s-3.6 0-4.8-.1c-3.3-.1-4.8-1.7-4.9-4.9C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.8C2.4 3.9 3.9 2.4 7.2 2.3 8.4 2.2 8.8 2.2 12 2.2zm0 4.8a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 8.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4zm5.2-9.6a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z"/></svg><span id="instaTxt"></span></a>
+      <a id="whatsTopo" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg><span id="foneTopo"></span></a>
+    </nav>
+  </header>
+
+  <section class="sticker" aria-labelledby="titulo">
+    <div>
+      <div class="kicker">Minha frota</div>
+      <h1 id="titulo">Seus veículos na oficina</h1>
+      <div class="sub">Informe o telefone cadastrado na oficina e a placa de um dos seus veículos.</div>
+    </div>
+    <form id="form" class="minha-form" novalidate>
+      <div class="grid2">
+        <div class="field">
+          <label for="telefone">Telefone</label>
+          <input id="telefone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(67) 99999-9999" required>
+        </div>
+        <div class="field">
+          <label for="placaConf">Placa de um veículo</label>
+          <input id="placaConf" type="text" autocomplete="off" autocapitalize="characters" placeholder="ABC1D23" maxlength="8" required>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="b primary" id="btn" type="submit">Ver meus veículos</button>
+        <button class="linkbtn" id="esquecer" type="button" hidden>Usar outro telefone</button>
+      </div>
+      <div class="msg" id="msg" role="status" hidden></div>
+    </form>
+  </section>
+
+  <section class="summary" id="resumo" aria-label="Resumo da frota" hidden>
+    <div class="chip bad"><span class="num tab" id="nBad">0</span> vencidas</div>
+    <div class="chip warn"><span class="num tab" id="nWarn">0</span> próximas</div>
+    <div class="chip ok"><span class="num tab" id="nOk">0</span> em dia</div>
+  </section>
+
+  <div id="veiculos" class="frota-cli"></div>
+
+  <section class="sticker contact">
+    <div class="small" id="contatoTxt">Fale com a oficina para agendar.</div>
+    <a class="btn" id="whats" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>Agendar pelo WhatsApp</a>
+  </section>
+
+  <footer class="small legend">
+    <div><b style="color:var(--ok)">●</b> Em dia: longe do limite.</div>
+    <div><b style="color:var(--warn)">●</b> Próxima: faltam até 10% do intervalo ou 3.000 km (o que for menor), ou até 30 dias.</div>
+    <div><b style="color:var(--bad)">●</b> Vencida: passou da quilometragem ou da data.</div>
+    <div>O km atual é estimado pela média de km rodados por dia, com as visitas e o km que você informa na etiqueta.</div>
+    <div class="foot-links"><span>Só aparecem os veículos com o mesmo telefone no cadastro da oficina.</span><a href="./">Etiqueta digital</a></div>
+  </footer>
+</main>
+
+<script src="config.js"></script>
+<script>
+const CFG = window.ETIQUETA, U = window.ETQ;
+const $ = id => document.getElementById(id);
+const fmtKm = n => n == null ? "–" : Math.round(n).toLocaleString("pt-BR");
+const fmtData = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4) : "–";
+const TEXTO = { bad: "Vencida", warn: "Próxima", ok: "Em dia" };
+const ORIGEM = { estimado: "estimado", cliente: "informado por você", oficina: "informado pela oficina", visita: "na última visita" };
+const GUARDA = "minhaFrota";
+
+function el(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+// Telefone: só os dígitos, sem o 55 do Brasil (o mesmo que o backend faz).
+function soDigitos(t) {
+  let d = String(t || "").replace(/\D/g, "");
+  if ((d.length === 12 || d.length === 13) && d.startsWith("55")) d = d.slice(2);
+  return d;
+}
+
+function mensagem(txt, tipo) {
+  const m = $("msg");
+  m.hidden = !txt;
+  m.className = "msg" + (tipo ? " " + tipo : "");
+  m.textContent = txt || "";
+}
+
+// Link da etiqueta do veículo, no mesmo formato do que é gravado na NFC.
+function linkEtiqueta(v) {
+  const p = new URLSearchParams({ p: v.placa });
+  for (const s of CFG.servicos) {
+    const it = v.servicos.find(x => x.servico === s.id);
+    const cod = it ? U.codificar(it.ultimo_km, it.ultima_data) : "";
+    if (cod) p.set(s.c, cod);
+  }
+  return "./?" + p.toString();
+}
+
+function cartao(v) {
+  const sec = el("section", "sticker");
+  sec.setAttribute("aria-label", "Veículo " + v.placa);
+  const top = el("div", "top");
+  const placa = el("h2", "plate");
+  placa.append(el("span", null, v.placa));
+  top.append(placa);
+  if (v.servicos.length) {
+    const a = el("a", "b", "Abrir etiqueta");
+    a.href = linkEtiqueta(v);
+    top.append(a);
+  }
+  sec.append(top);
+
+  const facts = el("dl", "facts");
+  const fato = (t, valor, sub) => {
+    const d = el("div");
+    d.append(el("dt", null, t));
+    const dd = el("dd", "tab", valor);
+    if (sub) dd.append(el("span", "fato-sub", sub));
+    d.append(dd);
+    facts.append(d);
+  };
+  fato("Última visita", fmtData(v.ultima_visita));
+  fato("Km na última visita", v.ultimo_km != null ? fmtKm(v.ultimo_km) + " km" : "–");
+  fato("Km atual", v.km_atual != null ? fmtKm(v.km_atual) + " km" : "–", v.km_atual != null ? ORIGEM[v.origem_km] : "");
+  sec.append(facts);
+
+  if (!v.servicos.length) {
+    sec.append(el("div", "small", "Ainda sem manutenções registradas na oficina."));
+    return sec;
+  }
+  const ul = el("ul", "list");
+  for (const s of v.servicos) {
+    const li = el("li", "item " + s.status);
+    li.append(el("span", "dot"));
+    const b = el("div", "body");
+    const r1 = el("div", "row1");
+    r1.append(el("h3", "svc-nome", s.nome), el("span", "pill", TEXTO[s.status]));
+    const partes = [];
+    if (s.proximo_km != null) partes.push(fmtKm(s.proximo_km) + " km");
+    if (s.proxima_data) partes.push(fmtData(s.proxima_data));
+    const meta = el("div", "meta tab");
+    const feito = [];
+    if (s.ultima_data) feito.push("em " + fmtData(s.ultima_data));
+    if (s.ultimo_km != null) feito.push("com " + fmtKm(s.ultimo_km) + " km");
+    meta.append(el("span", null, "Feito " + feito.join(" ")));
+    if (s.falta_km != null) meta.append(el("span", null, s.falta_km > 0 ? "Faltam " + fmtKm(s.falta_km) + " km" : "Passou " + fmtKm(-s.falta_km) + " km"));
+    if (s.falta_dias != null) meta.append(el("span", null, s.falta_dias < 0 ? "Venceu há " + (-s.falta_dias) + " dias" : "Faltam " + s.falta_dias + (s.falta_dias === 1 ? " dia" : " dias")));
+    b.append(r1, el("div", "next tab", "Próxima: " + partes.join(" ou ")), meta);
+    li.append(b);
+    ul.append(li);
+  }
+  sec.append(ul);
+  return sec;
+}
+
+function mostrar(dados) {
+  const lista = $("veiculos");
+  lista.replaceChildren();
+  const cont = { bad: 0, warn: 0, ok: 0 };
+  const pend = [];
+  for (const v of dados.veiculos) {
+    lista.append(cartao(v));
+    for (const s of v.servicos) {
+      cont[s.status]++;
+      if (s.status !== "ok") pend.push(v.placa + ": " + s.nome);
+    }
+  }
+  $("nBad").textContent = cont.bad; $("nWarn").textContent = cont.warn; $("nOk").textContent = cont.ok;
+  $("resumo").hidden = false;
+  const n = dados.veiculos.length;
+  mensagem(n + (n === 1 ? " veículo encontrado." : " veículos encontrados."), "ok");
+  const msg = "Olá! Quero agendar manutenção da minha frota." + (pend.length ? " Itens: " + pend.join("; ") + "." : "");
+  $("whats").href = "https://wa.me/" + CFG.oficina.whatsapp + "?text=" + encodeURIComponent(msg);
+  $("contatoTxt").textContent = (pend.length
+    ? pend.length + (pend.length > 1 ? " itens pedem" : " item pede") + " atenção. Fale com a oficina para agendar."
+    : "Tudo em dia. A oficina avisa quando chegar a hora.") + " WhatsApp " + U.fone(CFG.oficina.whatsapp) + ".";
+}
+
+async function buscar() {
+  const telefone = soDigitos($("telefone").value), placa = U.placa($("placaConf").value);
+  if (telefone.length < 10 || telefone.length > 11) { mensagem("Digite o telefone com DDD.", "warn"); $("telefone").focus(); return; }
+  if (!/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(placa)) { mensagem("Digite uma placa válida, como ABC1D23.", "warn"); $("placaConf").focus(); return; }
+  if (!CFG.minhaFrota) { mensagem("Consulta indisponível no momento.", "bad"); return; }
+  $("btn").disabled = true;
+  mensagem("Buscando…");
+  try {
+    // Texto puro, sem cabeçalhos extras: o navegador não faz preflight de CORS.
+    const r = await fetch(CFG.minhaFrota, { method: "POST", body: JSON.stringify({ telefone, placa }) });
+    const dados = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(r.status === 429 ? "Muitas consultas. Espere alguns minutos e tente de novo."
+      : typeof dados.detail === "string" ? dados.detail : "Não foi possível consultar agora.");
+    try { localStorage.setItem(GUARDA, JSON.stringify({ telefone, placa })); } catch (e) {}
+    $("esquecer").hidden = false;
+    mostrar(dados);
+  } catch (e) {
+    $("veiculos").replaceChildren();
+    $("resumo").hidden = true;
+    mensagem(e.message === "Failed to fetch" ? "Sem conexão com a oficina. Tente de novo." : e.message, "bad");
+  } finally {
+    $("btn").disabled = false;
+  }
+}
+
+// Cabeçalho e contato
+const of = CFG.oficina;
+$("insta").href = "https://www.instagram.com/" + of.instagram + "/";
+$("instaTxt").textContent = "@" + of.instagram;
+$("whatsTopo").href = "https://wa.me/" + of.whatsapp;
+$("foneTopo").textContent = U.fone(of.whatsapp);
+$("whats").href = "https://wa.me/" + of.whatsapp;
+
+$("placaConf").addEventListener("input", e => { e.target.value = U.placa(e.target.value); });
+$("form").addEventListener("submit", e => { e.preventDefault(); buscar(); });
+$("esquecer").addEventListener("click", () => {
+  try { localStorage.removeItem(GUARDA); } catch (e) {}
+  $("telefone").value = ""; $("placaConf").value = "";
+  $("veiculos").replaceChildren(); $("resumo").hidden = true; $("esquecer").hidden = true;
+  mensagem("");
+  $("telefone").focus();
+});
+
+// Telefone e placa guardados neste aparelho: abre a frota direto.
+let salvo = null;
+try { salvo = JSON.parse(localStorage.getItem(GUARDA) || "null"); } catch (e) {}
+const daUrl = U.placa(new URLSearchParams(location.search).get("p"));
+if (salvo && salvo.telefone && salvo.placa) {
+  $("telefone").value = U.fone(salvo.telefone);
+  $("placaConf").value = salvo.placa;
+  buscar();
+} else if (daUrl) {
+  $("placaConf").value = daUrl;
+}
+</script>
+</body>
+</html>
