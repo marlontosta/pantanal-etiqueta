@@ -128,11 +128,22 @@ estão no sistema. O mesmo serviço na mesma placa e no mesmo dia não duplica.
 
 Na página do cliente, o km que ele digita em "Quilometragem atual" é enviado ao backend
 (`envioKm` no `config.js`) uns segundos depois que ele para de digitar, só se for maior que o
-km da etiqueta. Fica numa tabela separada (`leituras_cliente`), um valor por placa e dia, sem
-login. A página no GitHub Pages também envia, então etiquetas antigas contam. Para não poluir a
-estimativa, o km do cliente é ignorado se for menor que o de uma visita anterior, maior que o de
-uma visita posterior ou se exigir mais de 1.500 km por dia; e cada endereço IP pode enviar até
-30 vezes por hora. Km de placa que ainda não tem visita fica guardado e entra quando ela tiver.
+km da etiqueta. Fica numa tabela separada (`leituras_cliente`, coluna `origem` = `cliente` ou
+`oficina`), sem login. A página no GitHub Pages também envia, então etiquetas antigas contam.
+Para não poluir o banco (`frota.motivo_descarte`):
+
+- um km do cliente por placa e dia; vale o último do dia, mas nunca troca o km da oficina do mesmo dia;
+- é descartado se for menor que o de uma visita anterior ou maior que o de uma posterior;
+- é descartado se for igual ao último km conhecido, ou menor que um km já aceito (cliente ou oficina);
+- é descartado se, desde o último km conhecido (visita ou km aceito), rodar mais que
+  4 × a média de km/dia da placa + 300 km, nunca mais que 1.500 km por dia (sem média, vale só o
+  limite de 1.500 km/dia);
+- ficam só os 60 km de cliente mais recentes de cada placa; os mais antigos são apagados;
+- cada endereço IP pode enviar até 30 vezes por hora.
+
+A resposta é sempre `{"ok": true}`, guardando ou não, para ninguém descobrir as regras testando
+pelo navegador; o motivo do descarte vai para o log do servidor ("km do cliente descartado").
+Km de placa que ainda não tem visita fica guardado e entra quando ela tiver.
 
 ### Tela de frota
 
@@ -168,7 +179,8 @@ e "Registrar nova visita".
 | `POST /api/registros`      | `{placa, nome?, telefone?, servicos: [{servico, km, data}]}` |
 | `POST /api/ordens?placa=&data=&km=&nome=` | corpo = o PDF da OS (`application/pdf`) |
 | `GET /api/ordens/{id}`     | abre o PDF de uma OS                        |
-| `POST /api/leituras`       | `{placa, km}` do cliente, sem login         |
+| `POST /api/leituras`       | `{placa, km}` do cliente, sem login, em texto puro; sempre `{ok: true}` |
+| `POST /api/veiculos/{placa}/km` | `{km}` km atual informado pela oficina   |
 | `GET /api/frota`           | resumo de todas as placas                  |
 | `GET /api/veiculos/{placa}`| resumo e histórico de uma placa            |
 

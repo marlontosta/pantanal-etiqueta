@@ -88,7 +88,8 @@ def test_km_do_cliente(cliente, logado):
     envio = lambda corpo: cliente.post("/api/leituras", content=corpo, headers={"content-type": "text/plain"})
     assert envio('{"placa":"lmv-4g22","km":92000}').status_code == 200
     assert envio('{"placa":"LMV4G22","km":92500}').status_code == 200  # mesmo dia: vale o último
-    assert envio('{"placa":"LMV4G22","km":80000}').status_code == 422  # menor que a visita
+    # Menor que a visita: a resposta é a mesma, mas não guarda.
+    assert envio('{"placa":"LMV4G22","km":80000}').json() == {"ok": True}
     assert envio('{"placa":"XX","km":1}').status_code == 422
     assert envio("lixo").status_code == 422
     # Placa ainda sem visita fica guardada.
@@ -123,3 +124,39 @@ def test_km_atual_pela_oficina(cliente, logado):
     assert [(l["km"], l["origem"]) for l in det["leituras"]] == [(92500, "oficina")]
     logado.post("/api/sair")
     assert cliente.post("/api/veiculos/LMV4G22/km", json={"km": 93000}).status_code == 401
+
+
+def test_regras_do_km_do_cliente(cliente, logado):
+    hoje = config.hoje()
+    d = lambda n: (hoje - timedelta(days=n)).isoformat()
+    # Duas visitas: 10.000 km em 100 dias = 100 km/dia.
+    logado.post("/api/registros", json={"placa": "LMV4G22", "servicos": [
+        {"servico": "oleo", "km": 80000, "data": d(110)}, {"servico": "oleo", "km": 90000, "data": d(10)}]})
+    envio = lambda km: cliente.post("/api/leituras", content='{"placa":"LMV4G22","km":%d}' % km)
+    guardados = lambda: [(l["km"], l["origem"]) for l in logado.get("/api/veiculos/LMV4G22").json()["leituras"]]
+    for km in (90000,   # igual ao último km
+               89000,   # menor que a última visita
+               95000):  # 500 km/dia em 10 dias: mais que 4 x 100 km/dia + 300 km
+        assert envio(km).json() == {"ok": True}
+    assert guardados() == []
+    assert envio(93000).status_code == 200  # 300 km/dia: cabe
+    assert guardados() == [(93000, "cliente")]
+    assert envio(92500).status_code == 200  # no mesmo dia vale o último, mesmo menor (correção)
+    assert guardados() == [(92500, "cliente")]
+    # Com o km da oficina no dia, o do cliente não troca.
+    assert logado.post("/api/veiculos/LMV4G22/km", json={"km": 92600}).status_code == 200
+    envio(92700)
+    assert guardados() == [(92600, "oficina")]
+
+
+def test_km_do_cliente_guarda_so_os_ultimos(cliente, logado):
+    from app import db, main
+    with db.transacao() as con:
+        for i in range(70):
+            con.execute("INSERT INTO leituras_cliente (placa, km, data) VALUES ('QWE1R23', ?, ?)",
+                        (1000 + i * 10, (config.hoje() - timedelta(days=80 - i)).isoformat()))
+    assert cliente.post("/api/leituras", content='{"placa":"QWE1R23","km":2000}').status_code == 200
+    with db.transacao() as con:
+        datas = [r["data"] for r in con.execute("SELECT data FROM leituras_cliente WHERE placa = 'QWE1R23' ORDER BY data")]
+    assert len(datas) == main.MAX_LEITURAS_CLIENTE and datas[-1] == config.hoje().isoformat()
+

@@ -54,6 +54,37 @@ def leituras_validas(registros: list[dict], leituras: list[dict]) -> list[dict]:
     return saida
 
 
+# Km do cliente comparado com o último km conhecido: até MEDIA_VEZES a média da placa, mais uma folga.
+MEDIA_VEZES, FOLGA_KM = 4, 300
+
+
+def motivo_descarte(registros: list[dict], leituras: list[dict], km: int, data: date) -> str | None:
+    """Por que um km do cliente não deve ser guardado (None: pode guardar).
+    registros: visitas da placa. leituras: km já guardados (cliente e oficina), sem o do cliente no
+    mesmo dia, que este substitui."""
+    if not leituras_validas(registros, [{"km": km, "data": data.isoformat()}])[0]["usada"]:
+        return "não confere com as visitas"
+    aceitas = [lt for lt in leituras_validas(registros, leituras) if lt["usada"] and lt["data"] <= data.isoformat()]
+    pontos = [r for r in registros if r["km"] is not None and r["data"] <= data.isoformat()] + aceitas
+    if not pontos:
+        return None
+    ref = max(pontos, key=lambda r: (r["data"], r["km"]))
+    if km == ref["km"]:
+        return "igual ao último km"
+    if aceitas and km < max(lt["km"] for lt in aceitas):
+        return "menor que um km já informado"
+    if km < ref["km"]:
+        return "menor que o último km"
+    dias = max(1, (data - date.fromisoformat(ref["data"])).days)
+    media = km_por_dia(pontos)
+    limite = KM_DIA_MAXIMO * dias
+    if media:
+        limite = min(limite, MEDIA_VEZES * media * dias + FOLGA_KM)
+    if km - ref["km"] > limite:
+        return f"{(km - ref['km']) / dias:.0f} km/dia desde o último km"
+    return None
+
+
 def resumo_veiculo(placa: str, registros: list[dict], hoje: date, leituras: list[dict] = ()) -> dict:
     """registros: [{servico, km, data}] de uma placa, em qualquer ordem.
     leituras: [{km, data}] que o cliente digitou na página da etiqueta."""

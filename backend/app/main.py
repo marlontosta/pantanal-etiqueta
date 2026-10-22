@@ -4,6 +4,7 @@ Rodar: uvicorn app.main:app --reload  (dentro de backend/)
 """
 import hashlib
 import json
+import logging
 import re
 import time
 from contextlib import asynccontextmanager
@@ -19,6 +20,7 @@ from . import config, db, frota, seguranca
 
 OFICINA = config.FRONTEND / "oficina"
 PLACA = re.compile(r"^[A-Z]{3}\d[A-Z0-9]\d{2}$")
+log = logging.getLogger("pantanal")
 
 
 @asynccontextmanager
@@ -204,9 +206,11 @@ class Leitura(BaseModel):
     _placa = field_validator("placa")(placa_valida)
 
 
-# Por IP: no máximo 30 envios por hora, para ninguém encher o banco.
+# Por IP: limite de envios numa janela, para ninguém encher o banco.
 _envios: dict[str, list[float]] = {}
 MAX_ENVIOS, JANELA_ENVIOS = 30, 3600
+# Km do cliente guardados por placa; os mais antigos saem.
+MAX_LEITURAS_CLIENTE = 60
 
 
 def _ip(req: Request) -> str:
@@ -214,26 +218,38 @@ def _ip(req: Request) -> str:
     return fwd or (req.client.host if req.client else "")
 
 
+def _limite(tentativas: dict[str, list[float]], ip: str, maximo: int, janela: int) -> None:
+    agora = time.monotonic()
+    tent = [t for t in tentativas.get(ip, []) if agora - t < janela]
+    if len(tent) >= maximo:
+        tentativas[ip] = tent
+        raise HTTPException(429, "Muitas tentativas. Espere alguns minutos.")
+    tentativas[ip] = tent + [agora]
+
+
 @app.post("/api/leituras")
 async def salvar_leitura(req: Request):
-    agora, ip = time.monotonic(), _ip(req)
-    tent = [t for t in _envios.get(ip, []) if agora - t < JANELA_ENVIOS]
-    if len(tent) >= MAX_ENVIOS:
-        raise HTTPException(429, "Muitos envios.")
-    _envios[ip] = tent + [agora]
+    _limite(_envios, _ip(req), MAX_ENVIOS, JANELA_ENVIOS)
     try:
         lt = Leitura.model_validate(json.loads(await req.body()))
     except (ValueError, ValidationError):
         raise HTTPException(422, "Placa ou km inválidos.")
     hoje = config.hoje()
-    leituras = frota.leituras_validas(_registros(lt.placa), [{"km": lt.km, "data": hoje.isoformat()}])
-    if not leituras[0]["usada"]:
-        raise HTTPException(422, "Km não confere com as visitas.")
+    # O km do cliente no mesmo dia é substituído por este; o da oficina fica.
+    anteriores = [x for x in _leituras(lt.placa) if not (x["data"] == hoje.isoformat() and x["origem"] == "cliente")]
+    motivo = frota.motivo_descarte(_registros(lt.placa), anteriores, lt.km, hoje)
+    if motivo:
+        # A resposta é a mesma de quando guarda, para ninguém descobrir as regras pelo navegador.
+        log.warning("km do cliente descartado: %s %s km (%s)", lt.placa, lt.km, motivo)
+        return {"ok": True}
     with db.transacao() as con:
         con.execute("INSERT INTO leituras_cliente (placa, km, data) VALUES (?, ?, ?)"
                     " ON CONFLICT (placa, data) DO UPDATE SET km = excluded.km, criado_em = datetime('now')"
                     " WHERE origem = 'cliente'",
                     (lt.placa, lt.km, hoje.isoformat()))
+        con.execute("DELETE FROM leituras_cliente WHERE placa = ? AND origem = 'cliente' AND id NOT IN"
+                    " (SELECT id FROM leituras_cliente WHERE placa = ? AND origem = 'cliente' ORDER BY data DESC LIMIT ?)",
+                    (lt.placa, lt.placa, MAX_LEITURAS_CLIENTE))
     return {"ok": True}
 
 
