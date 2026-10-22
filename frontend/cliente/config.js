@@ -66,6 +66,12 @@ window.ETQ = {
     return { km: isNaN(km) ? null : String(km), dt: isNaN(dias) ? null : new Date(this.EPOCA + dias * 864e5).toISOString().slice(0, 10) };
   },
   placa(s) { return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7); },
+  // Endereço de uma rota da API: a página servida pelo próprio backend (PythonAnywhere ou um
+  // servidor local) usa o mesmo endereço dela; só a do GitHub Pages usa o endereço completo do config.
+  api(url) {
+    if (!url || !/^https?:$/.test(location.protocol) || location.hostname.endsWith("github.io")) return url;
+    try { return new URL(url).pathname; } catch (e) { return url; }
+  },
   fone(n) {
     const d = String(n).replace(/\D/g, "").replace(/^55/, "");
     return d.length === 11 ? "(" + d.slice(0, 2) + ") " + d.slice(2, 7) + "-" + d.slice(7) : n;

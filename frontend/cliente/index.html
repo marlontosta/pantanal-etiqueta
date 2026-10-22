@@ -237,7 +237,7 @@ function enviarKm() {
   if (!podeEnviar || !km || km <= kmUltimo) return;
   const chave = "enviado:" + placa, hojeTxt = U.iso(hoje());
   try { if (localStorage.getItem(chave) === hojeTxt + ":" + km) return; } catch (e) {}
-  fetch(CFG.envioKm, { method: "POST", mode: "no-cors", keepalive: true, body: JSON.stringify({ placa, km }) })
+  fetch(U.api(CFG.envioKm), { method: "POST", mode: "no-cors", keepalive: true, body: JSON.stringify({ placa, km }) })
     .then(() => { try { localStorage.setItem(chave, hojeTxt + ":" + km); } catch (e) {} }, () => {});
 }
 
@@ -306,7 +306,7 @@ function montarAbas(veiculos) {
 
 const telefone = (daEtiqueta.get("t") || "").replace(/\D/g, "");
 if (CFG.minhaFrota && temDados && telefone.length >= 10) {
-  fetch(CFG.minhaFrota, { method: "POST", body: JSON.stringify({ telefone }) })
+  fetch(U.api(CFG.minhaFrota), { method: "POST", body: JSON.stringify({ telefone }) })
     .then(r => r.ok ? r.json() : null)
     .then(d => {
       // Só com mais de um veículo, e se a placa da etiqueta for mesmo desse telefone.
